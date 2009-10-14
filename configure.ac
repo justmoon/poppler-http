@@ -179,6 +179,20 @@ AM_CONDITIONAL(BUILD_ZLIB, test x$enable_zlib = xyes)
 AH_TEMPLATE([ENABLE_ZLIB],
 	    [Use zlib instead of builtin zlib decoder.])
 
+dnl Test for libcurl
+AC_ARG_ENABLE(libcurl,
+	      AC_HELP_STRING([--disable-libcurl],
+	                     [Don't build against libcurl.]),
+              enable_libcurl=$enableval,
+              enable_libcurl="try")
+if test x$enable_libcurl != xno; then
+  POPPLER_FIND_CURL
+fi
+
+AM_CONDITIONAL(BUILD_LIBCURL, test x$enable_libcurl = xyes)
+AH_TEMPLATE([ENABLE_LIBCURL],
+            [Build against libcurl.])
+
 
 dnl Test for libjpeg
 AC_ARG_ENABLE(libjpeg,
@@ -573,6 +587,7 @@ echo "  use gtk-doc:        $enable_gtk_doc"
 echo "  use libjpeg:        $enable_libjpeg"
 echo "  use libpng:         $enable_libpng"
 echo "  use zlib:           $enable_zlib"
+echo "  use libcurl:        $enable_libcurl"
 echo "  use libopenjpeg:    $enable_libopenjpeg"
 echo "  use cms:            $enable_cms"
 echo "  command line utils: $enable_utils"

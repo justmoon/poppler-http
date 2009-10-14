@@ -98,6 +98,13 @@ zlib_libs = 					\
 
 endif
 
+if BUILD_LIBCURL
+
+libcurl_libs =					\
+	$(LIBCURL_LIBS)
+
+endif
+
 if BUILD_ABIWORD_OUTPUT
 
 abiword_sources =				\
@@ -144,6 +151,7 @@ libpoppler_la_LIBADD =				\
 	$(libjpeg_libs)				\
 	$(libpng_libs)				\
 	$(zlib_libs)				\
+	$(libcurl_libs)				\
 	$(libjpeg2000_libs)			\
 	$(abiword_libs)				\
 	$(FREETYPE_LIBS)			\

@@ -7,6 +7,9 @@
 #cmakedefine ENABLE_ZLIB 1
 
 /* Use libpng to export images in pdftohtml. */
+#cmakedefine ENABLE_LIBCURL 1
+
+/* Use libpng to export images in pdftohtml. */
 #cmakedefine ENABLE_LIBPNG 1
 
 /* Use liblcms for color management. */
