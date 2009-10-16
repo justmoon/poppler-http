@@ -58,6 +58,9 @@
 #include "Parser.h"
 #include "SecurityHandler.h"
 #include "Decrypt.h"
+#ifdef ENABLE_LIBCURL
+#include "CurlCache.h"
+#endif
 #ifndef DISABLE_OUTLINE
 #include "Outline.h"
 #endif
@@ -89,28 +92,44 @@ PDFDoc::PDFDoc(GooString *fileNameA, GooString *ownerPassword,
   outline = NULL;
 #endif
 
-  fileName = fileNameA;
-
-  // try to open file
-#ifdef VMS
-  file = fopen(fileName->getCString(), "rb", "ctx=stm");
-#else
-  file = fopen(fileName->getCString(), "rb");
-#endif
-  if (file == NULL) {
-    // fopen() has failed.
-    // Keep a copy of the errno returned by fopen so that it can be 
-    // referred to later.
-    fopenErrno = errno;
-    error(-1, "Couldn't open file '%s': %s.", fileName->getCString(),
-                                              strerror(errno));
+  if (fileNameA->cmpN("http://", 7) == 0 || fileNameA->cmpN("https://", 8) == 0) {
+#ifndef ENABLE_LIBCURL
+    error(-1, "Couldn't open file '%s': HTTP support not compiled in.", fileNameA->getCString());
     errCode = errOpenFile;
     return;
-  }
+#else
+  	CurlCache *cc = new CurlCache(fileNameA);
+  	
+  	fileName = cc->getFileName();
+  	
+    // create streamObject obj;
+    obj.initNull();
+    str = new HttpStream(cc, 0, gFalse, 0, &obj);
+#endif
+  } else {
+    fileName = fileNameA;
 
-  // create stream
-  obj.initNull();
-  str = new FileStream(file, 0, gFalse, 0, &obj);
+    // try to open file
+#ifdef VMS
+    file = fopen(fileName->getCString(), "rb", "ctx=stm");
+#else
+    file = fopen(fileName->getCString(), "rb");
+#endif
+    if (file == NULL) {
+    	// fopen() has failed.
+    	// Keep a copy of the errno returned by fopen so that it can be 
+    	// referred to later.
+    	fopenErrno = errno;
+    	error(-1, "Couldn't open file '%s': %s.", fileName->getCString(),
+    	                                          strerror(errno));
+    	errCode = errOpenFile;
+    	return;
+    }
+
+    // create stream
+    obj.initNull();
+    str = new FileStream(file, 0, gFalse, 0, &obj);
+  }
 
   ok = setup(ownerPassword, userPassword);
 }

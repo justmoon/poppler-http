@@ -166,6 +166,7 @@ set(poppler_SRCS
   poppler/Catalog.cc
   poppler/CharCodeToUnicode.cc
   poppler/CMap.cc
+  poppler/CurlCache.cc
   poppler/DateInfo.cc
   poppler/Decrypt.cc
   poppler/Dict.cc
@@ -296,6 +297,7 @@ if(ENABLE_XPDF_HEADERS)
     poppler/Catalog.h
     poppler/CharCodeToUnicode.h
     poppler/CMap.h
+    poppler/CurlCache.h
     poppler/DateInfo.h
     poppler/Decrypt.h
     poppler/Dict.h

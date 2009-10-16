@@ -173,6 +173,7 @@ poppler_include_HEADERS =	\
 	Catalog.h		\
 	CharCodeToUnicode.h	\
 	CMap.h			\
+	CurlCache.h		\
 	DateInfo.h		\
 	Decrypt.h		\
 	Dict.h			\
@@ -244,6 +245,7 @@ libpoppler_la_SOURCES =		\
 	Catalog.cc 		\
 	CharCodeToUnicode.cc	\
 	CMap.cc			\
+	CurlCache.cc	\
 	DateInfo.cc		\
 	Decrypt.cc		\
 	Dict.cc 		\

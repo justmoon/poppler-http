@@ -794,6 +794,99 @@ void FileStream::moveStart(int delta) {
 }
 
 //------------------------------------------------------------------------
+// HttpStream
+//------------------------------------------------------------------------
+
+#ifdef ENABLE_LIBCURL
+
+HttpStream::HttpStream(CurlCache *ccA, Guint startA, GBool limitedA,
+		       Guint lengthA, Object *dictA):
+    BaseStream(dictA) {
+  cc = ccA;
+  start = startA;
+  limited = limitedA;
+  length = lengthA;
+  bufPtr = bufEnd = buf;
+  bufPos = start;
+  savePos = 0;
+  saved = gFalse;
+}
+
+HttpStream::~HttpStream() {
+  close();
+}
+
+Stream *HttpStream::makeSubStream(Guint startA, GBool limitedA,
+				  Guint lengthA, Object *dictA) {
+  return new HttpStream(cc, startA, limitedA, lengthA, dictA);
+}
+
+void HttpStream::reset() {
+  savePos = (Guint)cc->tell();
+  cc->seek(start, SEEK_SET);
+  
+  saved = gTrue;
+  bufPtr = bufEnd = buf;
+  bufPos = start;
+}
+
+void HttpStream::close() {
+  if (saved) {
+    cc->seek(savePos, SEEK_SET);
+    saved = gFalse;
+  }
+}
+
+GBool HttpStream::fillBuf() {
+  int n;
+
+  bufPos += bufEnd - buf;
+  bufPtr = bufEnd = buf;
+  if (limited && bufPos >= start + length) {
+    return gFalse;
+  }
+  if (limited && bufPos + httpStreamBufSize > start + length) {
+    n = start + length - bufPos;
+  } else {
+    n = httpStreamBufSize;
+  }
+  cc->read(buf, 1, n);
+  bufEnd = buf + n;
+  if (bufPtr >= bufEnd) {
+    return gFalse;
+  }
+  return gTrue;
+}
+
+void HttpStream::setPos(Guint pos, int dir) {
+  Guint size;
+
+  if (dir >= 0) {
+    cc->seek(pos, SEEK_SET);
+    bufPos = pos;
+  } else {
+    cc->seek(0, SEEK_END);
+    size = (Guint)cc->tell();
+    
+    if (pos > size)
+      pos = (Guint)size;
+    
+    cc->seek(-(int)pos, SEEK_END);
+    bufPos = (Guint)cc->tell();
+  }
+  
+  bufPtr = bufEnd = buf;
+}
+
+void HttpStream::moveStart(int delta) {
+  start += delta;
+  bufPtr = bufEnd = buf;
+  bufPos = start;
+}
+
+#endif
+
+//------------------------------------------------------------------------
 // MemStream
 //------------------------------------------------------------------------
 

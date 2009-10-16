@@ -34,12 +34,17 @@
 #include "goo/gtypes.h"
 #include "Object.h"
 
+#ifdef ENABLE_LIBCURL
+#include "CurlCache.h"
+#endif
+
 class BaseStream;
 
 //------------------------------------------------------------------------
 
 enum StreamKind {
   strFile,
+  strHttp,
   strASCIIHex,
   strASCII85,
   strLZW,
@@ -397,6 +402,54 @@ private:
   int savePos;
   GBool saved;
 };
+
+//------------------------------------------------------------------------
+// HttpStream
+//------------------------------------------------------------------------
+
+#ifdef ENABLE_LIBCURL
+
+#define httpStreamBufSize 1024
+
+class HttpStream: public BaseStream {
+public:
+
+  HttpStream(CurlCache *ccA, Guint startA, GBool limitedA,
+	     Guint lengthA, Object *dictA);
+  virtual ~HttpStream();
+  virtual Stream *makeSubStream(Guint startA, GBool limitedA,
+				Guint lengthA, Object *dictA);
+  virtual StreamKind getKind() { return strHttp; }
+  virtual void reset();
+  virtual void close();
+  virtual int getChar()
+    { return (bufPtr >= bufEnd && !fillBuf()) ? EOF : (*bufPtr++ & 0xff); }
+  virtual int lookChar()
+    { return (bufPtr >= bufEnd && !fillBuf()) ? EOF : (*bufPtr & 0xff); }
+  virtual int getPos() { return bufPos + (bufPtr - buf); }
+  virtual void setPos(Guint pos, int dir = 0);
+  virtual Guint getStart() { return start; }
+  virtual void moveStart(int delta);
+
+  virtual int getUnfilteredChar () { return getChar(); }
+  virtual void unfilteredReset () { reset(); }
+
+private:
+
+  GBool fillBuf();
+
+  CurlCache *cc;
+  Guint start;
+  GBool limited;
+  Guint length;
+  char buf[httpStreamBufSize];
+  char *bufPtr;
+  char *bufEnd;
+  Guint bufPos;
+  int savePos;
+  GBool saved;
+};
+#endif
 
 //------------------------------------------------------------------------
 // MemStream
