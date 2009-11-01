@@ -54,6 +54,21 @@ static char *fontTypeNames[] = {
   "CID TrueType (OT)"
 };
 
+static char *fontTypeExtensions[] = {
+  "bin", // Unknown
+  "pfa", // Type 1
+  "pfa", // Type 1C
+  "otf", // Type 1C (OpenType)
+  "ps",  // Type 3
+  "ttf", // TrueType
+  "otf", // TrueType (OpenType)
+  "ps",  // CID Type 0
+  "ps",  // CID Type 0C
+  "otf", // CID Type 0C (OpenType)
+  "ttf", // CID TrueType
+  "otf"  // CID TrueType (OpenType)
+};
+
 static void scanFonts(Dict *resDict, PDFDoc *doc);
 static void scanFont(GfxFont *font, PDFDoc *doc);
 
@@ -63,6 +78,7 @@ static char ownerPassword[33] = "\001";
 static char userPassword[33] = "\001";
 static GBool printVersion = gFalse;
 static GBool printHelp = gFalse;
+static GBool extractFonts = gFalse;
 
 static const ArgDesc argDesc[] = {
   {"-f",      argInt,      &firstPage,     0,
@@ -73,6 +89,8 @@ static const ArgDesc argDesc[] = {
    "owner password (for encrypted files)"},
   {"-upw",    argString,   userPassword,   sizeof(userPassword),
    "user password (for encrypted files)"},
+  {"-x",      argFlag,     &extractFonts,  0,
+   "save extracted fonts to disk"},
   {"-v",      argFlag,     &printVersion,  0,
    "print copyright and version info"},
   {"-h",      argFlag,     &printHelp,     0,
@@ -257,7 +275,9 @@ static void scanFont(GfxFont *font, PDFDoc *doc) {
   Object fontObj, toUnicodeObj;
   GooString *name;
   GBool emb, subset, hasToUnicode;
-  int i;
+  char *fontBuf, fontFilename[255];
+  FILE *fontFile;
+  int i, fontBufLen;
 
   fontRef = *font->getID();
 
@@ -317,4 +337,26 @@ static void scanFont(GfxFont *font, PDFDoc *doc) {
     fonts = (Ref *)grealloc(fonts, fontsSize * sizeof(Ref));
   }
   fonts[fontsLen++] = *font->getID();
+  
+  // extract font
+  if (extractFonts && emb) {
+    // determine filename
+    if (name) {
+	  sprintf(fontFilename, "%s.%s", name->getCString(),
+	      fontTypeExtensions[font->getType()]);
+	} else {
+	  sprintf(fontFilename, "%d.%s", fontRef.num,
+	      fontTypeExtensions[font->getType()]);
+	}
+    
+    // write font to file
+    fontBuf = font->readEmbFontFile(doc->getXRef(), &fontBufLen);
+    fontFile = fopen(fontFilename, "wb");
+    if (!fontFile) {
+      error(-1, "Error while extracting font: Could not open target file for writing!\n");
+      return;
+    }
+    fwrite(fontBuf, 1, fontBufLen, fontFile);
+    fclose(fontFile);
+  }
 }
