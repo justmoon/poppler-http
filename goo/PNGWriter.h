@@ -20,7 +20,7 @@
 
 #include <cstdio>
 #include <png.h>
-#include "ImgWriter.h"
+#include "goo/ImgWriter.h"
 
 class PNGWriter : public ImgWriter
 {
