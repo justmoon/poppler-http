@@ -150,10 +150,10 @@ public:
   int getNumPages() { return numPages; }
 
   // Get a page.
-  Page *getPage(int i) { return pages[i-1]; }
+  Page *getPage(int i);
 
   // Get the reference for a page object.
-  Ref *getPageRef(int i) { return &pageRefs[i-1]; }
+  Ref *getPageRef(int i);
 
   // Return base URI, or NULL if none.
   GooString *getBaseURI() { return baseURI; }
@@ -200,6 +200,7 @@ public:
   Form* getForm() { return form; }
 
   enum PageMode {
+    pageModeNull,
     pageModeNone,
     pageModeOutlines,
     pageModeThumbs,
@@ -208,6 +209,7 @@ public:
     pageModeAttach
   };
   enum PageLayout {
+    pageLayoutNull,
     pageLayoutNone,
     pageLayoutSinglePage,
     pageLayoutOneColumn,
@@ -218,8 +220,8 @@ public:
   };
 
   // Returns the page mode.
-  PageMode getPageMode() { return pageMode; }
-  PageLayout getPageLayout() { return pageLayout; }
+  PageMode getPageMode();
+  PageLayout getPageLayout();
 
 private:
 
@@ -244,6 +246,7 @@ private:
   PageMode pageMode;		// page mode
   PageLayout pageLayout;	// page layout
 
+  void initPages();
   int readPageTree(Dict *pages, PageAttrs *attrs, int start,
 		   char *alreadyRead);
   Object *findDestInTree(Object *tree, GooString *name, Object *obj);

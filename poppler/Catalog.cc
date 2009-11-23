@@ -55,12 +55,9 @@
 //------------------------------------------------------------------------
 
 Catalog::Catalog(XRef *xrefA) {
-  Object catDict, pagesDict, pagesDictRef;
+  Object catDict, pagesDict;
   Object obj, obj2;
   Object optContentProps;
-  char *alreadyRead;
-  int numPages0;
-  int i;
 
   ok = gTrue;
   xref = xrefA;
@@ -84,9 +81,8 @@ Catalog::Catalog(XRef *xrefA) {
   if (acroForm.isDict()) {
     form = new Form(xref,&acroForm);
   }
-
-
-  // read page tree
+  
+  // get page count
   catDict.dictLookup("Pages", &pagesDict);
   // This should really be isDict("Pages"), but I've seen at least one
   // PDF file where the /Type entry is missing.
@@ -100,31 +96,11 @@ Catalog::Catalog(XRef *xrefA) {
   if (!obj.isNum()) {
     error(-1, "Page count in top-level pages object is wrong type (%s)",
 	  obj.getTypeName());
-    pagesSize = numPages0 = 0;
+    numPages = 0;
   } else {
-    pagesSize = numPages0 = (int)obj.getNum();
+    numPages = (int)obj.getNum();
   }
   obj.free();
-  pages = (Page **)gmallocn(pagesSize, sizeof(Page *));
-  pageRefs = (Ref *)gmallocn(pagesSize, sizeof(Ref));
-  for (i = 0; i < pagesSize; ++i) {
-    pages[i] = NULL;
-    pageRefs[i].num = -1;
-    pageRefs[i].gen = -1;
-  }
-  alreadyRead = (char *)gmalloc(xref->getNumObjects());
-  memset(alreadyRead, 0, xref->getNumObjects());
-  if (catDict.dictLookupNF("Pages", &pagesDictRef)->isRef() &&
-      pagesDictRef.getRefNum() >= 0 &&
-      pagesDictRef.getRefNum() < xref->getNumObjects()) {
-    alreadyRead[pagesDictRef.getRefNum()] = 1;
-  }
-  pagesDictRef.free();
-  numPages = readPageTree(pagesDict.getDict(), NULL, 0, alreadyRead);
-  gfree(alreadyRead);
-  if (numPages != numPages0) {
-    error(-1, "Page count in top-level pages object is incorrect");
-  }
   pagesDict.free();
 
   // read named destination dictionary
@@ -146,41 +122,6 @@ Catalog::Catalog(XRef *xrefA) {
 
   if (catDict.dictLookup("PageLabels", &obj)->isDict())
     pageLabelInfo = new PageLabelInfo(&obj, numPages);
-  obj.free();
-
-  // read page mode
-  pageMode = pageModeNone;
-  if (catDict.dictLookup("PageMode", &obj)->isName()) {
-    if (obj.isName("UseNone"))
-      pageMode = pageModeNone;
-    else if (obj.isName("UseOutlines"))
-      pageMode = pageModeOutlines;
-    else if (obj.isName("UseThumbs"))
-      pageMode = pageModeThumbs;
-    else if (obj.isName("FullScreen"))
-      pageMode = pageModeFullScreen;
-    else if (obj.isName("UseOC"))
-      pageMode = pageModeOC;
-    else if (obj.isName("UseAttachments"))
-      pageMode = pageModeAttach;
-  }
-  obj.free();
-
-  pageLayout = pageLayoutNone;
-  if (catDict.dictLookup("PageLayout", &obj)->isName()) {
-    if (obj.isName("SinglePage"))
-      pageLayout = pageLayoutSinglePage;
-    if (obj.isName("OneColumn"))
-      pageLayout = pageLayoutOneColumn;
-    if (obj.isName("TwoColumnLeft"))
-      pageLayout = pageLayoutTwoColumnLeft;
-    if (obj.isName("TwoColumnRight"))
-      pageLayout = pageLayoutTwoColumnRight;
-    if (obj.isName("TwoPageLeft"))
-      pageLayout = pageLayoutTwoPageLeft;
-    if (obj.isName("TwoPageRight"))
-      pageLayout = pageLayoutTwoPageRight;
-  }
   obj.free();
 
   // read base URI
@@ -278,6 +219,54 @@ GooString *Catalog::readMetadata() {
   return s;
 }
 
+Page *Catalog::getPage(int i) {
+  if (!pages) initPages();
+  
+  return pages[i-1];
+}
+
+Ref *Catalog::getPageRef(int i) {
+  if (!pages) initPages();
+  
+  return &pageRefs[i-1];
+}
+
+void Catalog::initPages() {
+  Object catDict, pagesDict, pagesDictRef;
+  Object obj;
+  int numPages0, i;
+  char *alreadyRead;
+
+  // If catDict was bad, our constructor would've failed, no need to check again
+  xref->getCatalog(&catDict);
+
+  catDict.dictLookup("Pages", &pagesDict);
+  pagesSize = numPages;
+  
+  pages = (Page **)gmallocn(pagesSize, sizeof(Page *));
+  pageRefs = (Ref *)gmallocn(pagesSize, sizeof(Ref));
+  for (i = 0; i < pagesSize; ++i) {
+    pages[i] = NULL;
+    pageRefs[i].num = -1;
+    pageRefs[i].gen = -1;
+  }
+  alreadyRead = (char *)gmalloc(xref->getNumObjects());
+  memset(alreadyRead, 0, xref->getNumObjects());
+  if (catDict.dictLookupNF("Pages", &pagesDictRef)->isRef() &&
+      pagesDictRef.getRefNum() >= 0 &&
+      pagesDictRef.getRefNum() < xref->getNumObjects()) {
+    alreadyRead[pagesDictRef.getRefNum()] = 1;
+  }
+  pagesDictRef.free();
+  numPages0 = readPageTree(pagesDict.getDict(), NULL, 0, alreadyRead);
+  gfree(alreadyRead);
+  if (numPages != numPages0) {
+    error(-1, "Page count in top-level pages object is incorrect");
+  }
+  pagesDict.free();
+  catDict.free();
+}
+
 int Catalog::readPageTree(Dict *pagesDict, PageAttrs *attrs, int start,
 			  char *alreadyRead) {
   Object kids;
@@ -360,6 +349,9 @@ int Catalog::readPageTree(Dict *pagesDict, PageAttrs *attrs, int start,
 
 int Catalog::findPage(int num, int gen) {
   int i;
+  
+  // the page tree has to be parsed for this to work
+  initPages();
 
   for (i = 0; i < numPages; ++i) {
     if (pageRefs[i].num == num && pageRefs[i].gen == gen)
@@ -471,6 +463,61 @@ GooString *Catalog::getJS(int i)
   obj2.free();
   obj.free();
   return js;
+}
+
+Catalog::PageMode Catalog::getPageMode() {
+  Object catDict, obj;
+
+  // If catDict was bad, our constructor would've failed, no need to check again
+  xref->getCatalog(&catDict);
+
+  if (pageMode == pageModeNull) {
+    // read page mode
+    pageMode = pageModeNone;
+    if (catDict.dictLookup("PageMode", &obj)->isName()) {
+      if (obj.isName("UseNone"))
+        pageMode = pageModeNone;
+      else if (obj.isName("UseOutlines"))
+        pageMode = pageModeOutlines;
+      else if (obj.isName("UseThumbs"))
+        pageMode = pageModeThumbs;
+      else if (obj.isName("FullScreen"))
+        pageMode = pageModeFullScreen;
+      else if (obj.isName("UseOC"))
+        pageMode = pageModeOC;
+      else if (obj.isName("UseAttachments"))
+        pageMode = pageModeAttach;
+    }
+    obj.free();
+  }
+  return pageMode;
+}
+
+Catalog::PageLayout Catalog::getPageLayout() {
+  Object catDict, obj;
+
+  // If catDict was bad, our constructor would've failed, no need to check again
+  xref->getCatalog(&catDict);
+
+  if (pageLayout == pageLayoutNull) {
+    pageLayout = pageLayoutNone;
+    if (catDict.dictLookup("PageLayout", &obj)->isName()) {
+      if (obj.isName("SinglePage"))
+        pageLayout = pageLayoutSinglePage;
+      if (obj.isName("OneColumn"))
+        pageLayout = pageLayoutOneColumn;
+      if (obj.isName("TwoColumnLeft"))
+        pageLayout = pageLayoutTwoColumnLeft;
+      if (obj.isName("TwoColumnRight"))
+        pageLayout = pageLayoutTwoColumnRight;
+      if (obj.isName("TwoPageLeft"))
+        pageLayout = pageLayoutTwoPageLeft;
+      if (obj.isName("TwoPageRight"))
+        pageLayout = pageLayoutTwoPageRight;
+    }
+    obj.free();
+  }
+  return pageLayout;
 }
 
 NameTree::NameTree()
