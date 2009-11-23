@@ -243,10 +243,16 @@ public:
   virtual Stream *getUndecodedStream() { return this; }
   virtual Dict *getDict() { return dict.getDict(); }
   virtual GooString *getFileName() { return NULL; }
+  virtual void preload(Guint from, Guint to) {}
+  virtual Guint getLength() { return length; }
 
   // Get/set position of first byte of stream within the file.
   virtual Guint getStart() = 0;
   virtual void moveStart(int delta) = 0;
+
+protected:
+
+  Guint length;
 
 private:
 
@@ -394,7 +400,6 @@ private:
   FILE *f;
   Guint start;
   GBool limited;
-  Guint length;
   char buf[fileStreamBufSize];
   char *bufPtr;
   char *bufEnd;
@@ -430,6 +435,7 @@ public:
   virtual void setPos(Guint pos, int dir = 0);
   virtual Guint getStart() { return start; }
   virtual void moveStart(int delta);
+  virtual void preload(Guint from, Guint to);
 
   virtual int getUnfilteredChar () { return getChar(); }
   virtual void unfilteredReset () { reset(); }
@@ -441,7 +447,6 @@ private:
   CurlCache *cc;
   Guint start;
   GBool limited;
-  Guint length;
   char buf[httpStreamBufSize];
   char *bufPtr;
   char *bufEnd;
@@ -485,7 +490,6 @@ private:
 
   char *buf;
   Guint start;
-  Guint length;
   char *bufEnd;
   char *bufPtr;
   GBool needFree;
@@ -525,7 +529,6 @@ private:
 
   Stream *str;
   GBool limited;
-  Guint length;
 };
 
 //------------------------------------------------------------------------

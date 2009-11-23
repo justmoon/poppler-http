@@ -884,6 +884,10 @@ void HttpStream::moveStart(int delta) {
   bufPos = start;
 }
 
+void HttpStream::preload(Guint from, Guint to) {
+  cc->preload(from, to);
+}
+
 #endif
 
 //------------------------------------------------------------------------

@@ -78,19 +78,10 @@ int CurlCache::seek(long int offset, int origin) {
 }
 
 size_t CurlCache::read(void *ptr, size_t unitsize, size_t count) {
-  int endPos = streamPos + unitsize*count;
+  long int endPos = streamPos + unitsize*count;
   //printf("Reading %li - %li\n", streamPos, streamPos + unitsize*count);
   
-  int startBlock = streamPos / curlCacheChunkSize;
-  int startSkip = streamPos % curlCacheChunkSize;
-  
-  int endBlock = (endPos-1) / curlCacheChunkSize;
-  int endSkip = curlCacheChunkSize-1 - ((endPos-1) % curlCacheChunkSize);
-  
-  //printf("Get block %i to %i, skipping %i at start and %i at end.\n", startBlock, endBlock, startSkip, endSkip);
-  
-  // Make sure data is in cache
-  loadChunks(startBlock, endBlock);
+  preload(streamPos, endPos);
   
   // Write data to buffer
   size_t toCopy = unitsize*count;
@@ -124,6 +115,21 @@ size_t CurlCache::read(void *ptr, size_t unitsize, size_t count) {
   return unitsize*count;
 }
 
+void CurlCache::preload(long int start, long int end) {
+  if (!end) end = size;
+
+  int startBlock = start / curlCacheChunkSize;
+  int startSkip = start % curlCacheChunkSize;
+  
+  int endBlock = (end-1) / curlCacheChunkSize;
+  int endSkip = curlCacheChunkSize-1 - ((end-1) % curlCacheChunkSize);
+  
+  //printf("Get block %i to %i, skipping %i at start and %i at end.\n", startBlock, endBlock, startSkip, endSkip);
+  
+  // Make sure data is in cache
+  loadChunks(startBlock, endBlock);
+}
+
 void CurlCache::loadChunks(int startBlock, int endBlock) {
   int startSequence;
   int i = startBlock;
@@ -132,19 +138,17 @@ void CurlCache::loadChunks(int startBlock, int endBlock) {
     if (chunks[i].state == cccStateNew) {
       startSequence = i;
       while (i < endBlock) {
+        i++;
         if (chunks[i].state != cccStateNew) {
           i--;
           break;
-        } else {
-          i++;
         }
       }
       
-      CurlCacheJob *ccj = new CurlCacheJob(this, startSequence, i++);
+      CurlCacheJob *ccj = new CurlCacheJob(this, startSequence, i);
       ccj->run();
-    } else {
-      i++;
     }
+    i++;
   }
 }
 

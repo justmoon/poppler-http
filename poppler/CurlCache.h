@@ -58,6 +58,7 @@ public:
   long int tell();
   int seek(long int offset, int origin);
   size_t read(void * ptr, size_t unitsize, size_t count);
+  void preload(long int start, long int end);
   
   void loadChunks(int startBlock, int endBlock);
 
