@@ -418,6 +418,10 @@ GBool XRef::readXRefTable(Parser *parser, Guint *pos) {
     }
     n = obj.getInt();
     obj.free();
+    
+    // preload entire subsection (reduces number of roundtrips for remote files)
+    str->preload(*pos, *pos + n*20);
+    
     if (first < 0 || n < 0 || first + n < 0) {
       goto err1;
     }
@@ -1012,6 +1016,13 @@ Object *XRef::fetch(int num, int gen, Object *obj) {
 
   default:
     goto err;
+  }
+  
+  // preload all stream objects
+  if (obj->isStream()) {
+  	Guint streamPos = obj->streamGetPos();
+    str->preload(streamPos, streamPos + obj->streamGetDict()->lookupNF("Length", &obj1)->getInt());
+    obj1.free();
   }
 
   return obj;
