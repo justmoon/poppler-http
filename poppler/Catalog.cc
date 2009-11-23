@@ -220,15 +220,13 @@ GooString *Catalog::readMetadata() {
 }
 
 Page *Catalog::getPage(int i) {
-  if (!pages) initPages();
-  
-  return pages[i-1];
+  if (pages) return pages[i-1];
+  else getPageFromTree(i);
 }
 
 Ref *Catalog::getPageRef(int i) {
-  if (!pages) initPages();
-  
-  return &pageRefs[i-1];
+  if (pages) &pageRefs[i-1];
+  else getPageFromTree(i)->getRef();
 }
 
 void Catalog::initPages() {
@@ -345,6 +343,113 @@ int Catalog::readPageTree(Dict *pagesDict, PageAttrs *attrs, int start,
   delete attrs1;
   ok = gFalse;
   return -1;
+}
+
+Page *Catalog::getPageFromTree(int pageNo) {
+  Object catDict, pagesDict, pagesDictRef;
+  Object obj;
+  int numPages0, i;
+  char *alreadyRead;
+  Page *page;
+
+  // If catDict was bad, our constructor would've failed, no need to check again
+  xref->getCatalog(&catDict);
+
+  catDict.dictLookup("Pages", &pagesDict);
+  pagesSize = numPages;
+  
+  alreadyRead = (char *)gmalloc(xref->getNumObjects());
+  memset(alreadyRead, 0, xref->getNumObjects());
+  if (catDict.dictLookupNF("Pages", &pagesDictRef)->isRef() &&
+      pagesDictRef.getRefNum() >= 0 &&
+      pagesDictRef.getRefNum() < xref->getNumObjects()) {
+    alreadyRead[pagesDictRef.getRefNum()] = 1;
+  }
+  pagesDictRef.free();
+  page = searchPageTree(pagesDict.getDict(), NULL, 0, pageNo, alreadyRead);
+  gfree(alreadyRead);
+  pagesDict.free();
+  catDict.free();
+  return page;
+}
+
+Page *Catalog::searchPageTree(Dict *pagesDict, PageAttrs *attrs, int start,
+			  int needle, char *alreadyRead) {
+  Object kids;
+  Object kid;
+  Object kidRef;
+  Object obj;
+  PageAttrs *attrs1, *attrs2;
+  Page *page;
+  int i, j;
+
+  attrs1 = new PageAttrs(attrs, pagesDict);
+  pagesDict->lookup("Kids", &kids);
+  if (!kids.isArray()) {
+    error(-1, "Kids object (page %d) is wrong type (%s)",
+	  start+1, kids.getTypeName());
+    return NULL;
+  }
+  for (i = 0; i < kids.arrayGetLength(); ++i) {
+    kids.arrayGetNF(i, &kidRef);
+    if (kidRef.isRef() &&
+	kidRef.getRefNum() >= 0 &&
+	kidRef.getRefNum() < xref->getNumObjects()) {
+      if (alreadyRead[kidRef.getRefNum()]) {
+	error(-1, "Loop in Pages tree");
+	kidRef.free();
+	continue;
+      }
+      alreadyRead[kidRef.getRefNum()] = 1;
+    }
+    kids.arrayGet(i, &kid);
+    if (kid.isDict("Page")) {
+      if (++start == needle) {
+        attrs2 = new PageAttrs(attrs1, kid.getDict());
+        page = new Page(xref, start, kid.getDict(), kidRef.getRef(), attrs2, form);
+        if (!page->isOk()) {
+	  goto err3;
+        } else {
+          goto success;
+        }
+      }
+    // This should really be isDict("Pages"), but I've seen at least one
+    // PDF file where the /Type entry is missing.
+    } else if (kid.isDict()) {
+      int subtreeSize = kid.dictLookup("Count", &obj)->getInt();
+      obj.free();
+      if ((start + subtreeSize) >= needle) {
+	  if (!(page = searchPageTree(kid.getDict(), attrs1, start, needle, alreadyRead)))
+            goto err2;
+          else
+            goto success;
+      } else {
+        start += subtreeSize;
+      }
+    } else {
+      error(-1, "Kid object (page %d) is wrong type (%s)",
+	    start+1, kid.getTypeName());
+    }
+    kid.free();
+    kidRef.free();
+  }
+  // page number not found
+  return NULL;
+
+ success:
+  delete attrs1;
+  kids.free();
+  return page;
+
+ err3:
+  delete page;
+ err2:
+  kid.free();
+  kidRef.free();
+  kids.free();
+  delete attrs1;
+  ok = gFalse;
+  return NULL;
 }
 
 int Catalog::findPage(int num, int gen) {

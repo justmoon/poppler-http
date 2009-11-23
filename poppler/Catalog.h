@@ -249,6 +249,9 @@ private:
   void initPages();
   int readPageTree(Dict *pages, PageAttrs *attrs, int start,
 		   char *alreadyRead);
+  Page *getPageFromTree(int pageNo);
+  Page *searchPageTree(Dict *pagesDict, PageAttrs *attrs, int start,
+		   int needle, char *alreadyRead);
   Object *findDestInTree(Object *tree, GooString *name, Object *obj);
 };
 

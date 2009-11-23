@@ -234,6 +234,9 @@ public:
   void getDefaultCTM(double *ctm, double hDPI, double vDPI,
 		     int rotate, GBool useMediaBox, GBool upsideDown);
 
+  // Get the page reference
+  Ref *getRef() { return &pageRef; }
+
 private:
 
   XRef *xref;			// the xref table for this PDF file
