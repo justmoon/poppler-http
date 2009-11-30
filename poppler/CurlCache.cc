@@ -74,17 +74,30 @@ int CurlCache::seek(long int offset, int origin) {
     streamPos = size + offset;
   }
   
+  if (streamPos > size) {
+    streamPos = 0;
+    return 1;
+  }
+  
   return 0;
 }
 
 size_t CurlCache::read(void *ptr, size_t unitsize, size_t count) {
-  long int endPos = streamPos + unitsize*count;
+  size_t bytes = unitsize*count;
+  size_t endPos = streamPos + bytes;
   //printf("Reading %li - %li\n", streamPos, streamPos + unitsize*count);
+  
+  if (endPos > size) {
+    endPos = size;
+    bytes = size - streamPos;
+  }
+  
+  if (bytes == 0) return 0;
   
   preload(streamPos, endPos);
   
   // Write data to buffer
-  size_t toCopy = unitsize*count;
+  size_t toCopy = bytes;
   
   while (toCopy) {
     int chunk = streamPos / curlCacheChunkSize;
@@ -112,11 +125,12 @@ size_t CurlCache::read(void *ptr, size_t unitsize, size_t count) {
     */
   }
   
-  return unitsize*count;
+  return bytes;
 }
 
-void CurlCache::preload(long int start, long int end) {
-  if (!end) end = size;
+void CurlCache::preload(size_t start, size_t end) {
+  if (end == 0 || end > size) end = size;
+  if (start > end) start = end - curlCacheChunkSize;
 
   int startBlock = start / curlCacheChunkSize;
   int startSkip = start % curlCacheChunkSize;
@@ -166,8 +180,8 @@ CurlCacheJob::CurlCacheJob(CurlCache *ccA, int startBlockA, int endBlockA) {
 }
 
 void CurlCacheJob::run() {
-  int fromByte = startBlock * curlCacheChunkSize;
-  int toByte = ((endBlock+1) * curlCacheChunkSize)-1;
+  size_t fromByte = startBlock * curlCacheChunkSize;
+  size_t toByte = ((endBlock+1) * curlCacheChunkSize)-1;
   
   if (toByte >= cc->size-1) {
     toByte = cc->size-1;
