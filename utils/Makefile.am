@@ -17,7 +17,8 @@ INCLUDES =					\
 	-I$(top_srcdir)/poppler			\
 	$(UTILS_CFLAGS)				\
 	$(FONTCONFIG_CFLAGS)			\
-	$(ABIWORD_CFLAGS)
+	$(ABIWORD_CFLAGS)                       \
+	$(CAIRO_CFLAGS)
 
 LDADD =						\
 	$(top_builddir)/poppler/libpoppler.la	\
@@ -36,6 +37,22 @@ pdftoabw_binary = pdftoabw
 
 endif
 
+if BUILD_CAIRO_OUTPUT
+
+pdftocairo_SOURCES =				\
+	pdftocairo.cc				\
+	$(common)
+
+pdftocairo_LDADD = $(LDADD) $(CAIRO_LIBS) \
+	$(top_builddir)/poppler/libpoppler-cairo.la
+
+
+pdftocairo_binary = pdftocairo
+
+pdftocairo_manpage = pdftocairo.1
+
+endif
+
 AM_LDFLAGS = @auto_import_flags@
 
 bin_PROGRAMS =					\
@@ -46,7 +63,8 @@ bin_PROGRAMS =					\
 	pdftotext				\
 	pdftohtml				\
 	$(pdftoppm_binary)			\
-	$(pdftoabw_binary)
+	$(pdftoabw_binary)                      \
+	$(pdftocairo_binary)
 
 dist_man1_MANS =				\
 	pdffonts.1				\
@@ -55,7 +73,8 @@ dist_man1_MANS =				\
 	pdftops.1				\
 	pdftotext.1				\
 	pdftohtml.1				\
-	$(pdftoppm_manpage)
+	$(pdftoppm_manpage)     \
+	$(pdftocairo_manpage)
 
 common = parseargs.c parseargs.h
 
