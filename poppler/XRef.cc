@@ -1020,8 +1020,11 @@ Object *XRef::fetch(int num, int gen, Object *obj) {
   
   // preload all stream objects
   if (obj->isStream()) {
-  	Guint streamPos = obj->streamGetPos();
-    str->preload(streamPos, streamPos + obj->streamGetDict()->lookupNF("Length", &obj1)->getInt());
+    Guint streamPos = obj->streamGetPos();
+    obj->streamGetDict()->lookupNF("Length", &obj1);
+    if (obj1.isInt()) {
+      str->preload(streamPos, streamPos + obj1.getInt());
+    }
     obj1.free();
   }
 
