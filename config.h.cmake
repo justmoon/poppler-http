@@ -1,28 +1,35 @@
 /* config.h.  Generated from config.h.cmake by cmake.  */
 
+/* Whether cairo has blend modes support */
+#cmakedefine CAIRO_HAS_BLEND_MODES 1
+
 /* Use libjpeg instead of builtin jpeg decoder. */
 #cmakedefine ENABLE_LIBJPEG 1
+
+/* Use libopenjpeg instead of builtin jpeg2000 decoder. */
+#cmakedefine ENABLE_LIBOPENJPEG 1
+
+/* Use libcurl to access remote PDFs via HTTP. */
+#cmakedefine ENABLE_LIBCURL 1
+
+/* Build against libpng. */
+#cmakedefine ENABLE_LIBPNG 1
 
 /* Use zlib instead of builtin zlib decoder. */
 #cmakedefine ENABLE_ZLIB 1
 
-/* Use libpng to export images in pdftohtml. */
-#cmakedefine ENABLE_LIBCURL 1
-
-/* Use libpng to export images in pdftohtml. */
-#cmakedefine ENABLE_LIBPNG 1
-
-/* Use liblcms for color management. */
-#cmakedefine USE_CMS 1
-
 /* Use cairo for rendering. */
 #cmakedefine HAVE_CAIRO 1
 
-/* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'. */
+/* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
+   */
 #cmakedefine HAVE_DIRENT_H 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #cmakedefine HAVE_DLFCN_H 1
+
+/* Define to 1 if you have the <fcntl.h> header file. */
+#cmakedefine HAVE_FCNTL_H 1
 
 /* Have FreeType2 include files */
 #cmakedefine HAVE_FREETYPE_H 1
@@ -39,11 +46,17 @@
 /* Defines if gettimeofday is available on your system */
 #cmakedefine HAVE_GETTIMEOFDAY 1
 
+/* Defines if gmtime_r is available on your system */
+#cmakedefine HAVE_GMTIME_R 1
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #cmakedefine HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ 1
+
+/* Defines if localtime_r is available on your system */
+#cmakedefine HAVE_LOCALTIME_R 1
 
 /* Define to 1 if you have the <memory.h> header file. */
 #cmakedefine HAVE_MEMORY_H 1
@@ -78,6 +91,9 @@
 /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'. */
 #cmakedefine HAVE_SYS_DIR_H 1
 
+/* Define to 1 if you have the <sys/mman.h> header file. */
+#cmakedefine HAVE_SYS_MMAN_H 1
+
 /* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'. */
 #cmakedefine HAVE_SYS_NDIR_H 1
 
@@ -106,7 +122,7 @@
 #define PACKAGE "poppler"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT ""
+#define PACKAGE_BUGREPORT "https://bugs.freedesktop.org/enter_bug.cgi?product=poppler"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "poppler"
@@ -116,6 +132,9 @@
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "poppler"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "${POPPLER_VERSION}"
@@ -128,6 +147,9 @@
 
 /* Enable word list support. */
 #cmakedefine TEXTOUT_WORD_LIST 1
+
+/* Defines if use cms */
+#cmakedefine USE_CMS 1
 
 /* Throw exceptions to deal with not enough memory and similar problems */
 #cmakedefine USE_EXCEPTIONS 1

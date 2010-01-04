@@ -61,10 +61,6 @@
 #include "DateInfo.h"
 #include <string.h>
 
-#define annotFlagHidden    0x0002
-#define annotFlagPrint     0x0004
-#define annotFlagNoView    0x0020
-
 #define fieldFlagReadOnly           0x00000001
 #define fieldFlagRequired           0x00000002
 #define fieldFlagNoExport           0x00000004
@@ -611,19 +607,16 @@ AnnotBorderBS::AnnotBorderBS(Dict *dict) {
 
 AnnotColor::AnnotColor() {
   length = 0;
-  values = NULL;
 }
 
 AnnotColor::AnnotColor(double gray) {
   length = 1;
-  values = (double *) gmallocn (length, sizeof(double));
 
   values[0] = gray;
 }
 
 AnnotColor::AnnotColor(double r, double g, double b) {
   length = 3;
-  values = (double *) gmallocn (length, sizeof(double));
 
   values[0] = r;
   values[1] = g;
@@ -632,7 +625,6 @@ AnnotColor::AnnotColor(double r, double g, double b) {
 
 AnnotColor::AnnotColor(double c, double m, double y, double k) {
   length = 4;
-  values = (double *) gmallocn (length, sizeof(double));
 
   values[0] = c;
   values[1] = m;
@@ -640,34 +632,42 @@ AnnotColor::AnnotColor(double c, double m, double y, double k) {
   values[3] = k;
 }
 
-AnnotColor::AnnotColor(Array *array) {
-  // TODO: check what Acrobat does in the case of having more than 5 numbers.
-  if (array->getLength() < 5) {
-    length = array->getLength();
-    values = (double *) gmallocn (length, sizeof(double));
+// If <adjust> is +1, color is brightened;
+// if <adjust> is -1, color is darkened;
+// otherwise color is not modified.
+AnnotColor::AnnotColor(Array *array, int adjust) {
+  int i;
 
-    for(int i = 0; i < length; i++) {  
-      Object obj1;
+  length = array->getLength();
+  if (length > 4)
+    length = 4;
 
-      if (array->get(i, &obj1)->isNum()) {
-        values[i] = obj1.getNum();
+  for (i = 0; i < length; i++) {
+    Object obj1;
 
-        if (values[i] < 0 || values[i] > 1)
-          values[i] = 0;
-      } else {
+    if (array->get(i, &obj1)->isNum()) {
+      values[i] = obj1.getNum();
+
+      if (values[i] < 0 || values[i] > 1)
         values[i] = 0;
-      }
-      obj1.free();
+    } else {
+      values[i] = 0;
     }
-  } else {
-    values = NULL;
-    length = 0;
+    obj1.free();
   }
-}
 
-AnnotColor::~AnnotColor() {
-  if (values)
-    gfree (values);
+  if (length == 4) {
+    adjust = -adjust;
+  }
+  if (adjust > 0) {
+    for (i = 0; i < length; ++i) {
+      values[i] = 0.5 * values[i] + 0.5;
+    }
+  } else if (adjust < 0) {
+    for (i = 0; i < length; ++i) {
+      values[i] = 0.5 * values[i];
+    }
+  }
 }
 
 //------------------------------------------------------------------------
@@ -900,6 +900,8 @@ void Annot::initialize(XRef *xrefA, Dict *dict, Catalog *catalog) {
   appearBuf = NULL;
   fontSize = 0;
 
+  appearance.initNull();
+
   //----- parse the rectangle
   rect = new PDFRectangle();
   if (dict->lookup("Rect", &obj1)->isArray() && obj1.arrayGetLength() == 4) {
@@ -1080,7 +1082,7 @@ void Annot::setColor(AnnotColor *new_color) {
 
   if (new_color) {
     Object obj1, obj2;
-    double *values = new_color->getValues();
+    const double *values = new_color->getValues();
 
     obj1.initArray(xref);
     for (int i = 0; i < (int)new_color->getSpace(); i++)
@@ -1144,51 +1146,28 @@ Annot::~Annot() {
   oc.free();
 }
 
-// Set the current fill or stroke color, based on <a> (which should
-// have 1, 3, or 4 elements).  If <adjust> is +1, color is brightened;
-// if <adjust> is -1, color is darkened; otherwise color is not
-// modified.
-void Annot::setColor(Array *a, GBool fill, int adjust) {
-  Object obj1;
-  double color[4];
-  int nComps, i;
+void Annot::setColor(AnnotColor *color, GBool fill) {
+  const double *values = color->getValues();
 
-  nComps = a->getLength();
-  if (nComps > 4) {
-    nComps = 4;
-  }
-  for (i = 0; i < nComps && i < 4; ++i) {
-    if (a->get(i, &obj1)->isNum()) {
-      color[i] = obj1.getNum();
-    } else {
-      color[i] = 0;
-    }
-    obj1.free();
-  }
-  if (nComps == 4) {
-    adjust = -adjust;
-  }
-  if (adjust > 0) {
-    for (i = 0; i < nComps; ++i) {
-      color[i] = 0.5 * color[i] + 0.5;
-    }
-  } else if (adjust < 0) {
-    for (i = 0; i < nComps; ++i) {
-      color[i] = 0.5 * color[i];
-    }
-  }
-  if (nComps == 4) {
+  switch (color->getSpace()) {
+  case AnnotColor::colorCMYK:
     appearBuf->appendf("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:c}\n",
-        color[0], color[1], color[2], color[3],
-        fill ? 'k' : 'K');
-  } else if (nComps == 3) {
+		       values[0], values[1], values[2], values[3],
+		       fill ? 'k' : 'K');
+    break;
+  case AnnotColor::colorRGB:
     appearBuf->appendf("{0:.2f} {1:.2f} {2:.2f} {3:s}\n",
-        color[0], color[1], color[2],
-        fill ? "rg" : "RG");
-  } else {
+		       values[0], values[1], values[2],
+		       fill ? "rg" : "RG");
+    break;
+  case AnnotColor::colorGray:
     appearBuf->appendf("{0:.2f} {1:c}\n",
-        color[0],
-        fill ? 'g' : 'G');
+		       values[0],
+		       fill ? 'g' : 'G');
+    break;
+  case AnnotColor::colorTransparent:
+  default:
+    break;
   }
 }
 
@@ -1266,25 +1245,32 @@ void Annot::drawCircleBottomRight(double cx, double cy, double r) {
   appearBuf->append("S\n");
 }
 
-void Annot::draw(Gfx *gfx, GBool printing) {
-  Object obj;
-
+GBool Annot::isVisible(GBool printing) {
   // check the flags
-  if ((flags & annotFlagHidden) ||
-      (printing && !(flags & annotFlagPrint)) ||
-      (!printing && (flags & annotFlagNoView))) {
-    return;
+  if ((flags & flagHidden) ||
+      (printing && !(flags & flagPrint)) ||
+      (!printing && (flags & flagNoView))) {
+    return gFalse;
   }
 
   // check the OC
   if (optContentConfig && oc.isRef()) {
     if (! optContentConfig->optContentIsVisible(&oc))
-      return;
+      return gFalse;
   }
+
+  return gTrue;
+}
+
+void Annot::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+
+  if (!isVisible (printing))
+    return;
 
   // draw the appearance stream
   appearance.fetch(xref, &obj);
-  gfx->drawAnnot(&obj, (type == typeLink) ? border : (AnnotBorder *)NULL, color,
+  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color, 1,
       rect->x1, rect->y1, rect->x2, rect->y2);
   obj.free();
 }
@@ -1613,6 +1599,313 @@ void AnnotText::setIcon(GooString *new_icon) {
   update("Name", &obj1);
 }
 
+#define ANNOT_TEXT_AP_NOTE                                                    \
+  "3.602 24 m 20.398 24 l 22.387 24 24 22.387 24 20.398 c 24 3.602 l 24\n"    \
+  "1.613 22.387 0 20.398 0 c 3.602 0 l 1.613 0 0 1.613 0 3.602 c 0 20.398\n"  \
+  "l 0 22.387 1.613 24 3.602 24 c h\n"                                        \
+  "3.602 24 m f\n"                                                            \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                       \
+  "1 J\n"                                                                     \
+  "1 j\n"                                                                     \
+  "[] 0.0 d\n"                                                                \
+  "4 M 9 18 m 4 18 l 4 7 4 4 6 3 c 20 3 l 18 4 18 7 18 18 c 17 18 l S\n"      \
+  "1.5 w\n"                                                                   \
+  "0 j\n"                                                                     \
+  "10 16 m 14 21 l S\n"                                                       \
+  "1.85625 w\n"                                                               \
+  "1 j\n"                                                                     \
+  "15.07 20.523 m 15.07 19.672 14.379 18.977 13.523 18.977 c 12.672 18.977\n" \
+  "11.977 19.672 11.977 20.523 c 11.977 21.379 12.672 22.07 13.523 22.07 c\n" \
+  "14.379 22.07 15.07 21.379 15.07 20.523 c h\n"                              \
+  "15.07 20.523 m S\n"                                                        \
+  "1 w\n"                                                                     \
+  "0 j\n"                                                                     \
+  "6.5 13.5 m 15.5 13.5 l S\n"                                                \
+  "6.5 10.5 m 13.5 10.5 l S\n"                                                \
+  "6.801 7.5 m 15.5 7.5 l S\n"                                                \
+  "0.729412 0.741176 0.713725 RG 2 w\n"                                       \
+  "1 j\n"                                                                     \
+  "9 19 m 4 19 l 4 8 4 5 6 4 c 20 4 l 18 5 18 8 18 19 c 17 19 l S\n"          \
+  "1.5 w\n"                                                                   \
+  "0 j\n"                                                                     \
+  "10 17 m 14 22 l S\n"                                                       \
+  "1.85625 w\n"                                                               \
+  "1 j\n"                                                                     \
+  "15.07 21.523 m 15.07 20.672 14.379 19.977 13.523 19.977 c 12.672 19.977\n" \
+  "11.977 20.672 11.977 21.523 c 11.977 22.379 12.672 23.07 13.523 23.07 c\n" \
+  "14.379 23.07 15.07 22.379 15.07 21.523 c h\n"                              \
+  "15.07 21.523 m S\n"                                                        \
+  "1 w\n"                                                                     \
+  "0 j\n"                                                                     \
+  "6.5 14.5 m 15.5 14.5 l S\n"                                                \
+  "6.5 11.5 m 13.5 11.5 l S\n"                                                \
+  "6.801 8.5 m 15.5 8.5 l S\n"
+
+#define ANNOT_TEXT_AP_COMMENT                                                   \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"      \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"    \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                          \
+  "4.301 23 m f\n"                                                              \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                         \
+  "0 J\n"                                                                       \
+  "1 j\n"                                                                       \
+  "[] 0.0 d\n"                                                                  \
+  "4 M 8 20 m 16 20 l 18.363 20 20 18.215 20 16 c 20 13 l 20 10.785 18.363 9\n" \
+  "16 9 c 13 9 l 8 3 l 8 9 l 8 9 l 5.637 9 4 10.785 4 13 c 4 16 l 4 18.215\n"   \
+  "5.637 20 8 20 c h\n"                                                         \
+  "8 20 m S\n"                                                                  \
+  "0.729412 0.741176 0.713725 RG 8 21 m 16 21 l 18.363 21 20 19.215 20 17\n"    \
+  "c 20 14 l 20 11.785 18.363 10\n"                                             \
+  "16 10 c 13 10 l 8 4 l 8 10 l 8 10 l 5.637 10 4 11.785 4 14 c 4 17 l 4\n"     \
+  "19.215 5.637 21 8 21 c h\n"                                                  \
+  "8 21 m S\n"
+
+#define ANNOT_TEXT_AP_KEY                                                    \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"   \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n" \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                       \
+  "4.301 23 m f\n"                                                           \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                      \
+  "1 J\n"                                                                    \
+  "0 j\n"                                                                    \
+  "[] 0.0 d\n"                                                               \
+  "4 M 11.895 18.754 m 13.926 20.625 17.09 20.496 18.961 18.465 c 20.832\n"  \
+  "16.434 20.699 13.27 18.668 11.398 c 17.164 10.016 15.043 9.746 13.281\n"  \
+  "10.516 c 12.473 9.324 l 11.281 10.078 l 9.547 8.664 l 9.008 6.496 l\n"    \
+  "7.059 6.059 l 6.34 4.121 l 5.543 3.668 l 3.375 4.207 l 2.938 6.156 l\n"   \
+  "10.57 13.457 l 9.949 15.277 10.391 17.367 11.895 18.754 c h\n"            \
+  "11.895 18.754 m S\n"                                                      \
+  "1.5 w\n"                                                                  \
+  "16.059 15.586 m 16.523 15.078 17.316 15.043 17.824 15.512 c 18.332\n"     \
+  "15.98 18.363 16.77 17.895 17.277 c 17.43 17.785 16.637 17.816 16.129\n"   \
+  "17.352 c 15.621 16.883 15.59 16.094 16.059 15.586 c h\n"                  \
+  "16.059 15.586 m S\n"                                                      \
+  "0.729412 0.741176 0.713725 RG 2 w\n"                                      \
+  "11.895 19.754 m 13.926 21.625 17.09 21.496 18.961 19.465 c 20.832\n"      \
+  "17.434 20.699 14.27 18.668 12.398 c 17.164 11.016 15.043 10.746 13.281\n" \
+  "11.516 c 12.473 10.324 l 11.281 11.078 l 9.547 9.664 l 9.008 7.496 l\n"   \
+  "7.059 7.059 l 6.34 5.121 l 5.543 4.668 l 3.375 5.207 l 2.938 7.156 l\n"   \
+  "10.57 14.457 l 9.949 16.277 10.391 18.367 11.895 19.754 c h\n"            \
+  "11.895 19.754 m S\n"                                                      \
+  "1.5 w\n"                                                                  \
+  "16.059 16.586 m 16.523 16.078 17.316 16.043 17.824 16.512 c 18.332\n"     \
+  "16.98 18.363 17.77 17.895 18.277 c 17.43 18.785 16.637 18.816 16.129\n"   \
+  "18.352 c 15.621 17.883 15.59 17.094 16.059 16.586 c h\n"                  \
+  "16.059 16.586 m S\n"
+
+#define ANNOT_TEXT_AP_HELP                                                        \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"        \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"      \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                            \
+  "4.301 23 m f\n"                                                                \
+  "0.533333 0.541176 0.521569 RG 2.5 w\n"                                         \
+  "1 J\n"                                                                         \
+  "1 j\n"                                                                         \
+  "[] 0.0 d\n"                                                                    \
+  "4 M 8.289 16.488 m 8.824 17.828 10.043 18.773 11.473 18.965 c 12.902 19.156\n" \
+  "14.328 18.559 15.195 17.406 c 16.062 16.254 16.242 14.723 15.664 13.398\n"     \
+  "c S\n"                                                                         \
+  "0 j\n"                                                                         \
+  "12 8 m 12 12 16 11 16 15 c S\n"                                                \
+  "1.539286 w\n"                                                                  \
+  "1 j\n"                                                                         \
+  "q 1 0 0 -0.999991 0 24 cm\n"                                                   \
+  "12.684 20.891 m 12.473 21.258 12.004 21.395 11.629 21.196 c 11.254\n"          \
+  "20.992 11.105 20.531 11.297 20.149 c 11.488 19.77 11.945 19.61 12.332\n"       \
+  "19.789 c 12.719 19.969 12.891 20.426 12.719 20.817 c S Q\n"                    \
+  "0.729412 0.741176 0.713725 RG 2.5 w\n"                                         \
+  "8.289 17.488 m 9.109 19.539 11.438 20.535 13.488 19.711 c 15.539 18.891\n"     \
+  "16.535 16.562 15.711 14.512 c 15.699 14.473 15.684 14.438 15.664 14.398\n"     \
+  "c S\n"                                                                         \
+  "0 j\n"                                                                         \
+  "12 9 m 12 13 16 12 16 16 c S\n"                                                \
+  "1.539286 w\n"                                                                  \
+  "1 j\n"                                                                         \
+  "q 1 0 0 -0.999991 0 24 cm\n"                                                   \
+  "12.684 19.891 m 12.473 20.258 12.004 20.395 11.629 20.195 c 11.254\n"          \
+  "19.992 11.105 19.531 11.297 19.149 c 11.488 18.77 11.945 18.61 12.332\n"       \
+  "18.789 c 12.719 18.969 12.891 19.426 12.719 19.817 c S Q\n"
+
+#define ANNOT_TEXT_AP_NEW_PARAGRAPH                                               \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"        \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"      \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                            \
+  "4.301 23 m f\n"                                                                \
+  "0.533333 0.541176 0.521569 RG 4 w\n"                                           \
+  "0 J\n"                                                                         \
+  "2 j\n"                                                                         \
+  "[] 0.0 d\n"                                                                    \
+  "4 M q 1 0 0 -1 0 24 cm\n"                                                      \
+  "9.211 11.988 m 8.449 12.07 7.711 11.707 7.305 11.059 c 6.898 10.41\n"          \
+  "6.898 9.59 7.305 8.941 c 7.711 8.293 8.449 7.93 9.211 8.012 c S Q\n"           \
+  "1.004413 w\n"                                                                  \
+  "1 J\n"                                                                         \
+  "1 j\n"                                                                         \
+  "q 1 0 0 -0.991232 0 24 cm\n"                                                   \
+  "18.07 11.511 m 15.113 10.014 l 12.199 11.602 l 12.711 8.323 l 10.301\n"        \
+  "6.045 l 13.574 5.517 l 14.996 2.522 l 16.512 5.474 l 19.801 5.899 l\n"         \
+  "17.461 8.252 l 18.07 11.511 l h\n"                                             \
+  "18.07 11.511 m S Q\n"                                                          \
+  "2 w\n"                                                                         \
+  "0 j\n"                                                                         \
+  "11 17 m 10 17 l 10 3 l S\n"                                                    \
+  "14 3 m 14 13 l S\n"                                                            \
+  "0.729412 0.741176 0.713725 RG 4 w\n"                                           \
+  "0 J\n"                                                                         \
+  "2 j\n"                                                                         \
+  "q 1 0 0 -1 0 24 cm\n"                                                          \
+  "9.211 10.988 m 8.109 11.105 7.125 10.309 7.012 9.211 c 6.895 8.109\n"          \
+  "7.691 7.125 8.789 7.012 c 8.93 6.996 9.07 6.996 9.211 7.012 c S Q\n"           \
+  "1.004413 w\n"                                                                  \
+  "1 J\n"                                                                         \
+  "1 j\n"                                                                         \
+  "q 1 0 0 -0.991232 0 24 cm\n"                                                   \
+  "18.07 10.502 m 15.113 9.005 l 12.199 10.593 l 12.711 7.314 l 10.301\n"         \
+  "5.036 l 13.574 4.508 l 14.996 1.513 l 16.512 4.465 l 19.801 4.891 l\n"         \
+  "17.461 7.243 l 18.07 10.502 l h\n"                                             \
+  "18.07 10.502 m S Q\n"                                                          \
+  "2 w\n"                                                                         \
+  "0 j\n"                                                                         \
+  "11 18 m 10 18 l 10 4 l S\n"                                                    \
+  "14 4 m 14 14 l S\n"
+
+#define ANNOT_TEXT_AP_PARAGRAPH                                              \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"   \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n" \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                       \
+  "4.301 23 m f\n"                                                           \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                      \
+  "1 J\n"                                                                    \
+  "1 j\n"                                                                    \
+  "[] 0.0 d\n"                                                               \
+  "4 M 15 3 m 15 18 l 11 18 l 11 3 l S\n"                                    \
+  "4 w\n"                                                                    \
+  "q 1 0 0 -1 0 24 cm\n"                                                     \
+  "9.777 10.988 m 8.746 10.871 7.973 9.988 8 8.949 c 8.027 7.91 8.844\n"     \
+  "7.066 9.879 7.004 c S Q\n"                                                \
+  "0.729412 0.741176 0.713725 RG 2 w\n"                                      \
+  "15 4 m 15 19 l 11 19 l 11 4 l S\n"                                        \
+  "4 w\n"                                                                    \
+  "q 1 0 0 -1 0 24 cm\n"                                                     \
+  "9.777 9.988 m 8.746 9.871 7.973 8.988 8 7.949 c 8.027 6.91 8.844 6.066\n" \
+  "9.879 6.004 c S Q\n"
+
+#define ANNOT_TEXT_AP_INSERT                                                 \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"   \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n" \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                       \
+  "4.301 23 m f\n"                                                           \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                      \
+  "1 J\n"                                                                    \
+  "0 j\n"                                                                    \
+  "[] 0.0 d\n"                                                               \
+  "4 M 12 18.012 m 20 18 l S\n"                                              \
+  "9 10 m 17 10 l S\n"                                                       \
+  "12 14.012 m 20 14 l S\n"                                                  \
+  "12 6.012 m 20 6.012 l S\n"                                                \
+  "4 12 m 6 10 l 4 8 l S\n"                                                  \
+  "4 12 m 4 8 l S\n"                                                         \
+  "0.729412 0.741176 0.713725 RG 12 19.012 m 20 19 l S\n"                    \
+  "9 11 m 17 11 l S\n"                                                       \
+  "12 15.012 m 20 15 l S\n"                                                  \
+  "12 7.012 m 20 7.012 l S\n"                                                \
+  "4 13 m 6 11 l 4 9 l S\n"                                                  \
+  "4 13 m 4 9 l S\n"
+
+#define ANNOT_TEXT_AP_CROSS                                                  \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"   \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n" \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                       \
+  "4.301 23 m f\n"                                                           \
+  "0.533333 0.541176 0.521569 RG 2.5 w\n"                                    \
+  "1 J\n"                                                                    \
+  "0 j\n"                                                                    \
+  "[] 0.0 d\n"                                                               \
+  "4 M 18 5 m 6 17 l S\n"                                                    \
+  "6 5 m 18 17 l S\n"                                                        \
+  "0.729412 0.741176 0.713725 RG 18 6 m 6 18 l S\n"                          \
+  "6 6 m 18 18 l S\n"
+
+#define ANNOT_TEXT_AP_CIRCLE                                                      \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"        \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"      \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                            \
+  "4.301 23 m f\n"                                                                \
+  "0.533333 0.541176 0.521569 RG 2.5 w\n"                                         \
+  "1 J\n"                                                                         \
+  "1 j\n"                                                                         \
+  "[] 0.0 d\n"                                                                    \
+  "4 M 19.5 11.5 m 19.5 7.359 16.141 4 12 4 c 7.859 4 4.5 7.359 4.5 11.5 c 4.5\n" \
+  "15.641 7.859 19 12 19 c 16.141 19 19.5 15.641 19.5 11.5 c h\n"                 \
+  "19.5 11.5 m S\n"                                                               \
+  "0.729412 0.741176 0.713725 RG 19.5 12.5 m 19.5 8.359 16.141 5 12 5 c\n"        \
+  "7.859 5 4.5 8.359 4.5 12.5 c 4.5\n"                                            \
+  "16.641 7.859 20 12 20 c 16.141 20 19.5 16.641 19.5 12.5 c h\n"                 \
+  "19.5 12.5 m S\n"
+
+void AnnotText::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull()) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+
+    appearBuf->append ("q\n");
+    if (color)
+      setColor(color, gTrue);
+    else
+      appearBuf->append ("1 1 1 rg\n");
+    if (!icon->cmp("Note"))
+      appearBuf->append (ANNOT_TEXT_AP_NOTE);
+    else if (!icon->cmp("Comment"))
+      appearBuf->append (ANNOT_TEXT_AP_COMMENT);
+    else if (!icon->cmp("Key"))
+      appearBuf->append (ANNOT_TEXT_AP_KEY);
+    else if (!icon->cmp("Help"))
+      appearBuf->append (ANNOT_TEXT_AP_HELP);
+    else if (!icon->cmp("NewParagraph"))
+      appearBuf->append (ANNOT_TEXT_AP_NEW_PARAGRAPH);
+    else if (!icon->cmp("Paragraph"))
+      appearBuf->append (ANNOT_TEXT_AP_PARAGRAPH);
+    else if (!icon->cmp("Insert"))
+      appearBuf->append (ANNOT_TEXT_AP_INSERT);
+    else if (!icon->cmp("Cross"))
+      appearBuf->append (ANNOT_TEXT_AP_CROSS);
+    else if (!icon->cmp("Circle"))
+      appearBuf->append (ANNOT_TEXT_AP_CIRCLE);
+    appearBuf->append ("Q\n");
+
+    Object appearDict, obj1, obj2;
+
+    appearDict.initDict(xref);
+    appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    appearDict.dictSet("Subtype", obj1.initName("Form"));
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(24));
+    obj1.arrayAdd(obj2.initReal(24));
+    appearDict.dictSet("BBox", &obj1);
+
+    MemStream *appearStream = new MemStream(copyString(appearBuf->getCString()), 0,
+					    appearBuf->getLength(), &appearDict);
+    appearStream->setNeedFree(gTrue);
+    appearance.initStream(appearStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, border, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
+}
+
 //------------------------------------------------------------------------
 // AnnotLink
 //------------------------------------------------------------------------
@@ -1695,16 +1988,12 @@ void AnnotLink::initialize(XRef *xrefA, Catalog *catalog, Dict *dict) {
 void AnnotLink::draw(Gfx *gfx, GBool printing) {
   Object obj;
 
-  // check the flags
-  if ((flags & annotFlagHidden) ||
-      (printing && !(flags & annotFlagPrint)) ||
-      (!printing && (flags & annotFlagNoView))) {
+  if (!isVisible (printing))
     return;
-  }
 
   // draw the appearance stream
   appearance.fetch(xref, &obj);
-  gfx->drawAnnot(&obj, border, color,
+  gfx->drawAnnot(&obj, border, color, 1,
 		 rect->x1, rect->y1, rect->x2, rect->y2);
   obj.free();
 }
@@ -2023,6 +2312,72 @@ void AnnotLine::initialize(XRef *xrefA, Catalog *catalog, Dict *dict) {
   obj1.free();
 }
 
+void AnnotLine::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull()) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+    appearBuf->append ("q\n");
+    if (color)
+      setColor(color, gFalse);
+
+    if (border) {
+      int i, dashLength;
+      double *dash;
+
+      switch (border->getStyle()) {
+      case AnnotBorder::borderDashed:
+        appearBuf->append("[");
+	dashLength = border->getDashLength();
+	dash = border->getDash();
+	for (i = 0; i < dashLength; ++i)
+	  appearBuf->appendf(" {0:.2f}", dash[i]);
+	appearBuf->append(" ] 0 d\n");
+	break;
+      default:
+        appearBuf->append("[] 0 d\n");
+        break;
+      }
+      appearBuf->appendf("{0:.2f} w\n", border->getWidth());
+    }
+    appearBuf->appendf ("{0:.2f} {1:.2f} m\n", coord1->getX() - rect->x1, coord1->getY() - rect->y1);
+    appearBuf->appendf ("{0:.2f} {1:.2f} l\n", coord2->getX() - rect->x1, coord2->getY() - rect->y1);
+    // TODO: Line ending, caption, leader lines
+    appearBuf->append ("S\n");
+    appearBuf->append ("Q\n");
+
+    Object appearDict, obj1, obj2;
+
+    appearDict.initDict(xref);
+    appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    appearDict.dictSet("Subtype", obj1.initName("Form"));
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(rect->x2 - rect->x1));
+    obj1.arrayAdd(obj2.initReal(rect->y2 - rect->y1));
+    appearDict.dictSet("BBox", &obj1);
+
+    MemStream *appearStream = new MemStream(copyString(appearBuf->getCString()), 0,
+					      appearBuf->getLength(), &appearDict);
+    appearStream->setNeedFree(gTrue);
+    appearance.initStream(appearStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
+}
+
 //------------------------------------------------------------------------
 // AnnotTextMarkup
 //------------------------------------------------------------------------
@@ -2096,7 +2451,9 @@ void AnnotTextMarkup::initialize(XRef *xrefA, Catalog *catalog, Dict *dict) {
   if(dict->lookup("QuadPoints", &obj1)->isArray()) {
     quadrilaterals = new AnnotQuadrilaterals(obj1.getArray(), rect);
   } else {
+    error(-1, "Bad Annot Text Markup QuadPoints");
     quadrilaterals = NULL;
+    ok = gFalse;
   }
   obj1.free();
 }
@@ -2105,6 +2462,205 @@ AnnotTextMarkup::~AnnotTextMarkup() {
   if(quadrilaterals) {
     delete quadrilaterals;
   }
+}
+
+void AnnotTextMarkup::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+  int i;
+  Object obj1, obj2;
+  Object formDict, resDict;
+  MemStream *mStream;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull() || type == typeHighlight) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+
+    switch (type) {
+    case typeUnderline:
+      if (color) {
+        setColor(color, gFalse);
+	setColor(color, gTrue);
+      }
+
+      for (i = 0; i < quadrilaterals->getQuadrilateralsLength(); ++i) {
+        double x1, y1, x2, y2, x3, y3;
+	double x, y;
+
+	x1 = quadrilaterals->getX1(i);
+	y1 = quadrilaterals->getY1(i);
+	x2 = quadrilaterals->getX2(i);
+	y2 = quadrilaterals->getY2(i);
+	x3 = quadrilaterals->getX3(i);
+	y3 = quadrilaterals->getY3(i);
+
+	x = x1 - rect->x1;
+	y = y3 - rect->y1;
+	appearBuf->append ("[]0 d 2 w\n");
+	appearBuf->appendf ("{0:.2f} {1:.2f} m\n", x, y);
+	appearBuf->appendf ("{0:.2f} {1:.2f} l\n", x + (x2 - x1), y);
+	appearBuf->append ("S\n");
+      }
+      break;
+    case typeStrikeOut:
+      if (color) {
+        setColor(color, gFalse);
+	setColor(color, gTrue);
+      }
+
+      for (i = 0; i < quadrilaterals->getQuadrilateralsLength(); ++i) {
+        double x1, y1, x2, y2, x3, y3;
+	double x, y;
+	double h2;
+
+	x1 = quadrilaterals->getX1(i);
+	y1 = quadrilaterals->getY1(i);
+	x2 = quadrilaterals->getX2(i);
+	y2 = quadrilaterals->getY2(i);
+	x3 = quadrilaterals->getX3(i);
+	y3 = quadrilaterals->getY3(i);
+	h2 = (y1 - y3) / 2.0;
+
+	x = x1 - rect->x1;
+	y = (y3 - rect->y1) + h2;
+	appearBuf->append ("[]0 d 2 w\n");
+	appearBuf->appendf ("{0:.2f} {1:.2f} m\n", x, y);
+	appearBuf->appendf ("{0:.2f} {1:.2f} l\n", x + (x2 - x1), y);
+	appearBuf->append ("S\n");
+      }
+      break;
+    case typeSquiggly:
+      // TODO
+    default:
+    case typeHighlight:
+      appearance.free();
+
+      if (color)
+        setColor(color, gTrue);
+
+      for (i = 0; i < quadrilaterals->getQuadrilateralsLength(); ++i) {
+        double x1, y1, x2, y2, x3, y3, x4, y4;
+	double h4;
+
+	x1 = quadrilaterals->getX1(i);
+	y1 = quadrilaterals->getY1(i);
+	x2 = quadrilaterals->getX2(i);
+	y2 = quadrilaterals->getY2(i);
+	x3 = quadrilaterals->getX3(i);
+	y3 = quadrilaterals->getY3(i);
+	x4 = quadrilaterals->getX4(i);
+	y4 = quadrilaterals->getY4(i);
+	h4 = (y1 - y3) / 4.0;
+
+	appearBuf->appendf ("{0:.2f} {1:.2f} m\n", x3, y3);
+	appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			    x3 - h4, y3 + h4, x1 - h4, y1 - h4, x1, y1);
+	appearBuf->appendf ("{0:.2f} {1:.2f} l\n", x2, y2);
+	appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			    x2 + h4, y2 - h4, x4 + h4, y4 + h4, x4, y4);
+	appearBuf->append ("f\n");
+      }
+
+      Object appearDict;
+      appearDict.initDict(xref);
+      appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+      appearDict.dictSet("Subtype", obj1.initName("Form"));
+      obj1.initArray(xref);
+      obj1.arrayAdd(obj2.initReal(rect->x1));
+      obj1.arrayAdd(obj2.initReal(rect->y1));
+      obj1.arrayAdd(obj2.initReal(rect->x2));
+      obj1.arrayAdd(obj2.initReal(rect->y2));
+      appearDict.dictSet("BBox", &obj1);
+      obj1.initArray(xref);
+      obj1.arrayAdd(obj2.initReal(1));
+      obj1.arrayAdd(obj2.initReal(0));
+      obj1.arrayAdd(obj2.initReal(0));
+      obj1.arrayAdd(obj2.initReal(1));
+      obj1.arrayAdd(obj2.initReal(-rect->x1));
+      obj1.arrayAdd(obj2.initReal(-rect->y1));
+      appearDict.dictSet("Matrix", &obj1);
+
+      Object aStream;
+      mStream = new MemStream(copyString(appearBuf->getCString()), 0,
+			      appearBuf->getLength(), &appearDict);
+      mStream->setNeedFree(gTrue);
+      aStream.initStream(mStream);
+      delete appearBuf;
+
+      Object transDict;
+      formDict.initDict(xref);
+      formDict.dictSet ("Form", &aStream);
+      resDict.initDict(xref);
+      resDict.dictSet ("XObject", &formDict);
+
+      transDict.initDict(xref);
+      transDict.dictSet ("S", obj1.initName("Transparency"));
+
+      appearBuf = new GooString ("/Form Do");
+
+      formDict.initDict(xref);
+      formDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+      formDict.dictSet("Subtype", obj1.initName("Form"));
+      formDict.dictSet("Group", &transDict);
+      formDict.dictSet("Resources", &resDict);
+      obj1.initArray(xref);
+      obj1.arrayAdd(obj2.initReal(0));
+      obj1.arrayAdd(obj2.initReal(0));
+      obj1.arrayAdd(obj2.initReal(rect->x2 - rect->x1));
+      obj1.arrayAdd(obj2.initReal(rect->y2 - rect->y1));
+      formDict.dictSet("BBox", &obj1);
+
+      mStream = new MemStream(copyString(appearBuf->getCString()), 0,
+			      appearBuf->getLength(), &formDict);
+      mStream->setNeedFree(gTrue);
+      aStream.initStream(mStream);
+      delete appearBuf;
+
+      Object stateDict;
+
+      formDict.initDict(xref);
+      formDict.dictSet ("HAForm", &aStream);
+      transDict.initDict(xref);
+      transDict.dictSet ("BM", obj1.initName("Multiply"));
+      stateDict.initDict(xref);
+      stateDict.dictSet ("R0", &transDict);
+      resDict.initDict(xref);
+      resDict.dictSet ("XObject", &formDict);
+      resDict.dictSet ("ExtGState", &stateDict);
+
+      appearBuf = new GooString ("/R0 gs\n/HAForm Do");
+
+      break;
+    }
+
+    formDict.initDict(xref);
+    formDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    formDict.dictSet("Subtype", obj1.initName("Form"));
+    if (type == typeHighlight)
+      formDict.dictSet("Resources", &resDict);
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(rect->x2 - rect->x1));
+    obj1.arrayAdd(obj2.initReal(rect->y2 - rect->y1));
+    formDict.dictSet("BBox", &obj1);
+
+    mStream = new MemStream(copyString(appearBuf->getCString()), 0,
+			    appearBuf->getLength(), &formDict);
+    mStream->setNeedFree(gTrue);
+    appearance.initStream(mStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
 }
 
 //------------------------------------------------------------------------
@@ -3014,6 +3570,7 @@ void AnnotWidget::generateFieldAppearance() {
   GBool *selection;
   int dashLength, ff, quadding, comb, nOptions, topIdx, i, j;
   GBool modified;
+  AnnotColor aColor;
 
   if (widget == NULL || !widget->getField () || !widget->getField ()->getObj ()->isDict ())
     return;
@@ -3042,7 +3599,8 @@ void AnnotWidget::generateFieldAppearance() {
   if (mkDict) {
     if (mkDict->lookup("BG", &obj1)->isArray() &&
         obj1.arrayGetLength() > 0) {
-      setColor(obj1.getArray(), gTrue, 0);
+      AnnotColor aColor = AnnotColor (obj1.getArray());
+      setColor(&aColor, gTrue);
       appearBuf->appendf("0 0 {0:.2f} {1:.2f} re f\n",
           rect->x2 - rect->x1, rect->y2 - rect->y1);
     }
@@ -3090,19 +3648,23 @@ void AnnotWidget::generateFieldAppearance() {
             case AnnotBorder::borderSolid:
             case AnnotBorder::borderUnderlined:
               appearBuf->appendf("{0:.2f} w\n", w);
-              setColor(obj1.getArray(), gFalse, 0);
+	      aColor = AnnotColor (obj1.getArray());
+              setColor(&aColor, gFalse);
               drawCircle(0.5 * dx, 0.5 * dy, r - 0.5 * w, gFalse);
               break;
             case AnnotBorder::borderBeveled:
             case AnnotBorder::borderInset:
               appearBuf->appendf("{0:.2f} w\n", 0.5 * w);
-              setColor(obj1.getArray(), gFalse, 0);
+	      aColor = AnnotColor (obj1.getArray());
+              setColor(&aColor, gFalse);
               drawCircle(0.5 * dx, 0.5 * dy, r - 0.25 * w, gFalse);
-              setColor(obj1.getArray(), gFalse,
-                  border->getStyle() == AnnotBorder::borderBeveled ? 1 : -1);
+	      aColor = AnnotColor (obj1.getArray(),
+				   border->getStyle() == AnnotBorder::borderBeveled ? 1 : -1);
+              setColor(&aColor, gFalse);
               drawCircleTopLeft(0.5 * dx, 0.5 * dy, r - 0.75 * w);
-              setColor(obj1.getArray(), gFalse,
-                  border->getStyle() == AnnotBorder::borderBeveled ? -1 : 1);
+	      aColor = AnnotColor (obj1.getArray(),
+				   border->getStyle() == AnnotBorder::borderBeveled ? -1 : 1);
+              setColor(&aColor, gFalse);
               drawCircleBottomRight(0.5 * dx, 0.5 * dy, r - 0.75 * w);
               break;
           }
@@ -3120,14 +3682,16 @@ void AnnotWidget::generateFieldAppearance() {
               // fall through to the solid case
             case AnnotBorder::borderSolid:
               appearBuf->appendf("{0:.2f} w\n", w);
-              setColor(obj1.getArray(), gFalse, 0);
+	      aColor = AnnotColor (obj1.getArray());
+              setColor(&aColor, gFalse);
               appearBuf->appendf("{0:.2f} {0:.2f} {1:.2f} {2:.2f} re s\n",
                   0.5 * w, dx - w, dy - w);
               break;
             case AnnotBorder::borderBeveled:
             case AnnotBorder::borderInset:
-              setColor(obj1.getArray(), gTrue,
-                  border->getStyle() == AnnotBorder::borderBeveled ? 1 : -1);
+	      aColor = AnnotColor (obj1.getArray(),
+				   border->getStyle() == AnnotBorder::borderBeveled ? 1 : -1);
+	      setColor(&aColor, gTrue);
               appearBuf->append("0 0 m\n");
               appearBuf->appendf("0 {0:.2f} l\n", dy);
               appearBuf->appendf("{0:.2f} {1:.2f} l\n", dx, dy);
@@ -3135,8 +3699,9 @@ void AnnotWidget::generateFieldAppearance() {
               appearBuf->appendf("{0:.2f} {1:.2f} l\n", w, dy - w);
               appearBuf->appendf("{0:.2f} {0:.2f} l\n", w);
               appearBuf->append("f\n");
-              setColor(obj1.getArray(), gTrue,
-                  border->getStyle() == AnnotBorder::borderBeveled ? -1 : 1);
+	      aColor = AnnotColor (obj1.getArray(),
+				   border->getStyle() == AnnotBorder::borderBeveled ? -1 : 1);
+              setColor(&aColor, gTrue);
               appearBuf->append("0 0 m\n");
               appearBuf->appendf("{0:.2f} 0 l\n", dx);
               appearBuf->appendf("{0:.2f} {1:.2f} l\n", dx, dy);
@@ -3147,7 +3712,8 @@ void AnnotWidget::generateFieldAppearance() {
               break;
             case AnnotBorder::borderUnderlined:
               appearBuf->appendf("{0:.2f} w\n", w);
-              setColor(obj1.getArray(), gFalse, 0);
+	      aColor = AnnotColor (obj1.getArray());
+              setColor(&aColor, gFalse);
               appearBuf->appendf("0 0 m {0:.2f} 0 l s\n", dx);
               break;
           }
@@ -3210,7 +3776,8 @@ void AnnotWidget::generateFieldAppearance() {
                   obj3.arrayGetLength() > 0) {
                 dx = rect->x2 - rect->x1;
                 dy = rect->y2 - rect->y1;
-                setColor(obj3.getArray(), gTrue, 0);
+		aColor = AnnotColor (obj1.getArray());
+                setColor(&aColor, gTrue);
                 drawCircle(0.5 * dx, 0.5 * dy, 0.2 * (dx < dy ? dx : dy),
                     gTrue);
               }
@@ -3420,12 +3987,8 @@ void AnnotWidget::generateFieldAppearance() {
 void AnnotWidget::draw(Gfx *gfx, GBool printing) {
   Object obj;
 
-  // check the flags
-  if ((flags & annotFlagHidden) ||
-      (printing && !(flags & annotFlagPrint)) ||
-      (!printing && (flags & annotFlagNoView))) {
+  if (!isVisible (printing))
     return;
-  }
 
   addDingbatsResource = gFalse;
   generateFieldAppearance ();
@@ -3457,7 +4020,7 @@ void AnnotWidget::draw(Gfx *gfx, GBool printing) {
     gfx->pushResources(dict);
     delete dict;
   }
-  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color,
+  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color, 1,
 		 rect->x1, rect->y1, rect->x2, rect->y2);
   if (addDingbatsResource) {
     gfx->popResources();
@@ -3901,6 +4464,130 @@ void AnnotGeometry::initialize(XRef *xrefA, Catalog *catalog, Dict* dict) {
 
 }
 
+void AnnotGeometry::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull()) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+    appearBuf->append ("q\n");
+    if (color)
+      setColor(color, gFalse);
+
+    if (border) {
+      int i, dashLength;
+      double *dash;
+
+      switch (border->getStyle()) {
+      case AnnotBorder::borderDashed:
+        appearBuf->append("[");
+	dashLength = border->getDashLength();
+	dash = border->getDash();
+	for (i = 0; i < dashLength; ++i)
+	  appearBuf->appendf(" {0:.2f}", dash[i]);
+	appearBuf->append(" ] 0 d\n");
+	break;
+      default:
+        appearBuf->append("[] 0 d\n");
+        break;
+      }
+      appearBuf->appendf("{0:.2f} w\n", border->getWidth());
+    }
+
+    if (interiorColor)
+      setColor(interiorColor, gTrue);
+
+    if (type == typeSquare) {
+      appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} re\n",
+			  border->getWidth() / 2.0, border->getWidth() / 2.0,
+			  (rect->x2 - rect->x1) - border->getWidth(),
+			  (rect->y2 - rect->y1) - border->getWidth());
+    } else {
+      double width, height;
+      double b;
+      double x1, y1, x2, y2, x3, y3;
+
+      width = rect->x2 - rect->x1;
+      height = rect->y2 - rect->y1;
+      b = border->getWidth() / 2.0;
+
+      x1 = b;
+      y1 = height / 2.0;
+      appearBuf->appendf ("{0:.2f} {1:.2f} m\n", x1, y1);
+
+      y1 += height / 4.0;
+      x2 = width / 4.0;
+      y2 = height - b;
+      x3 = width / 2.0;
+      y3 = y2;
+      appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			  x1, y1, x2, y2, x3, y3);
+      x2 = width - b;
+      y2 = y1;
+      x1 = x3 + (width / 4.0);
+      y1 = y3;
+      x3 = x2;
+      y3 = height / 2.0;
+      appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			  x1, y1, x2, y2, x3, y3);
+
+      x2 = x1;
+      y2 = b;
+      x1 = x3;
+      y1 = height / 4.0;
+      x3 = width / 2.0;
+      y3 = b;
+      appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			  x1, y1, x2, y2, x3, y3);
+
+      x2 = b;
+      y2 = y1;
+      x1 = width / 4.0;
+      y1 = b;
+      x3 = b;
+      y3 = height / 2.0;
+      appearBuf->appendf ("{0:.2f} {1:.2f} {2:.2f} {3:.2f} {4:.2f} {5:.2f} c\n",
+			  x1, y1, x2, y2, x3, y3);
+
+    }
+
+    if (interiorColor)
+      appearBuf->append ("b\n");
+    else
+      appearBuf->append ("S\n");
+    appearBuf->append ("Q\n");
+
+    Object appearDict, obj1, obj2;
+
+    appearDict.initDict(xref);
+    appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    appearDict.dictSet("Subtype", obj1.initName("Form"));
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(rect->x2 - rect->x1));
+    obj1.arrayAdd(obj2.initReal(rect->y2 - rect->y1));
+    appearDict.dictSet("BBox", &obj1);
+
+    MemStream *appearStream = new MemStream(copyString(appearBuf->getCString()), 0,
+					    appearBuf->getLength(), &appearDict);
+    appearStream->setNeedFree(gTrue);
+    appearance.initStream(appearStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, (AnnotBorder *)NULL, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
+}
+
 //------------------------------------------------------------------------
 // AnnotPolygon
 //------------------------------------------------------------------------
@@ -4192,6 +4879,171 @@ void AnnotFileAttachment::initialize(XRef *xrefA, Catalog *catalog, Dict* dict) 
   obj1.free();
 }
 
+#define ANNOT_FILE_ATTACHMENT_AP_PUSHPIN                                         \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"       \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"     \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                           \
+  "4.301 23 m f\n"                                                               \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                          \
+  "1 J\n"                                                                        \
+  "1 j\n"                                                                        \
+  "[] 0.0 d\n"                                                                   \
+  "4 M 5 4 m 6 5 l S\n"                                                          \
+  "2 w\n"                                                                        \
+  "11 14 m 9 12 l 6 12 l 13 5 l 13 8 l 15 10 l 18 11 l 20 11 l 12 19 l 12\n"     \
+  "17 l 11 14 l h\n"                                                             \
+  "11 14 m S\n"                                                                  \
+  "3 w\n"                                                                        \
+  "6 5 m 9 8 l S\n"                                                              \
+  "0.729412 0.741176 0.713725 RG 2 w\n"                                          \
+  "5 5 m 6 6 l S\n"                                                              \
+  "2 w\n"                                                                        \
+  "11 15 m 9 13 l 6 13 l 13 6 l 13 9 l 15 11 l 18 12 l 20 12 l 12 20 l 12\n"     \
+  "18 l 11 15 l h\n"                                                             \
+  "11 15 m S\n"                                                                  \
+  "3 w\n"                                                                        \
+  "6 6 m 9 9 l S\n"
+
+#define ANNOT_FILE_ATTACHMENT_AP_PAPERCLIP                                       \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"       \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"     \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                           \
+  "4.301 23 m f\n"                                                               \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                          \
+  "1 J\n"                                                                        \
+  "1 j\n"                                                                        \
+  "[] 0.0 d\n"                                                                   \
+  "4 M 16.645 12.035 m 12.418 7.707 l 10.902 6.559 6.402 11.203 8.09 12.562 c\n" \
+  "14.133 18.578 l 14.949 19.387 16.867 19.184 17.539 18.465 c 20.551\n"         \
+  "15.23 l 21.191 14.66 21.336 12.887 20.426 12.102 c 13.18 4.824 l 12.18\n"     \
+  "3.82 6.25 2.566 4.324 4.461 c 3 6.395 3.383 11.438 4.711 12.801 c 9.648\n"    \
+  "17.887 l S\n"                                                                 \
+  "0.729412 0.741176 0.713725 RG 16.645 13.035 m 12.418 8.707 l\n"               \
+  "10.902 7.559 6.402 12.203 8.09 13.562 c\n"                                    \
+  "14.133 19.578 l 14.949 20.387 16.867 20.184 17.539 19.465 c 20.551\n"         \
+  "16.23 l 21.191 15.66 21.336 13.887 20.426 13.102 c 13.18 5.824 l 12.18\n"     \
+  "4.82 6.25 3.566 4.324 5.461 c 3 7.395 3.383 12.438 4.711 13.801 c 9.648\n"    \
+  "18.887 l S\n"
+
+#define ANNOT_FILE_ATTACHMENT_AP_GRAPH                                           \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"       \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"     \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                           \
+  "4.301 23 m f\n"                                                               \
+  "0.533333 0.541176 0.521569 RG 1 w\n"                                          \
+  "1 J\n"                                                                        \
+  "0 j\n"                                                                        \
+  "[] 0.0 d\n"                                                                   \
+  "4 M 18.5 15.5 m 18.5 13.086 l 16.086 15.5 l 18.5 15.5 l h\n"                  \
+  "18.5 15.5 m S\n"                                                              \
+  "7 7 m 10 11 l 13 9 l 18 15 l S\n"                                             \
+  "0.729412 0.741176 0.713725 RG 7 8 m 10 12 l 13 10 l 18 16 l S\n"              \
+  "18.5 16.5 m 18.5 14.086 l 16.086 16.5 l 18.5 16.5 l h\n"                      \
+  "18.5 16.5 m S\n"                                                              \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                          \
+  "1 j\n"                                                                        \
+  "3 19 m 3 3 l 21 3 l S\n"                                                      \
+  "0.729412 0.741176 0.713725 RG 3 20 m 3 4 l 21 4 l S\n"
+
+#define ANNOT_FILE_ATTACHMENT_AP_TAG                                             \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"       \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"     \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                           \
+  "4.301 23 m f\n"                                                               \
+  "0.533333 0.541176 0.521569 RG 0.999781 w\n"                                   \
+  "1 J\n"                                                                        \
+  "1 j\n"                                                                        \
+  "[] 0.0 d\n"                                                                   \
+  "4 M q 1 0 0 -1 0 24 cm\n"                                                     \
+  "8.492 8.707 m 8.492 9.535 7.82 10.207 6.992 10.207 c 6.164 10.207 5.492\n"    \
+  "9.535 5.492 8.707 c 5.492 7.879 6.164 7.207 6.992 7.207 c 7.82 7.207\n"       \
+  "8.492 7.879 8.492 8.707 c h\n"                                                \
+  "8.492 8.707 m S Q\n"                                                          \
+  "2 w\n"                                                                        \
+  "20.078 11.414 m 20.891 10.602 20.785 9.293 20.078 8.586 c 14.422 2.93 l\n"    \
+  "13.715 2.223 12.301 2.223 11.594 2.93 c 3.816 10.707 l 3.109 11.414\n"        \
+  "2.402 17.781 3.816 19.195 c 5.23 20.609 11.594 19.902 12.301 19.195 c\n"      \
+  "20.078 11.414 l h\n"                                                          \
+  "20.078 11.414 m S\n"                                                          \
+  "0.729412 0.741176 0.713725 RG 20.078 12.414 m\n"                              \
+  "20.891 11.605 20.785 10.293 20.078 9.586 c 14.422 3.93 l\n"                   \
+  "13.715 3.223 12.301 3.223 11.594 3.93 c 3.816 11.707 l 3.109 12.414\n"        \
+  "2.402 18.781 3.816 20.195 c 5.23 21.609 11.594 20.902 12.301 20.195 c\n"      \
+  "20.078 12.414 l h\n"                                                          \
+  "20.078 12.414 m S\n"                                                          \
+  "0.533333 0.541176 0.521569 RG 1 w\n"                                          \
+  "0 j\n"                                                                        \
+  "11.949 13.184 m 16.191 8.941 l S\n"                                           \
+  "0.729412 0.741176 0.713725 RG 11.949 14.184 m 16.191 9.941 l S\n"             \
+  "0.533333 0.541176 0.521569 RG 14.07 6.82 m 9.828 11.062 l S\n"                \
+  "0.729412 0.741176 0.713725 RG 14.07 7.82 m 9.828 12.062 l S\n"                \
+  "0.533333 0.541176 0.521569 RG 6.93 15.141 m 8 20 14.27 20.5 16 20.5 c\n"      \
+  "18.094 20.504 19.5 20 19.5 18 c 19.5 16.699 20.91 16.418 22.5 16.5 c S\n"     \
+  "0.729412 0.741176 0.713725 RG 0.999781 w\n"                                   \
+  "1 j\n"                                                                        \
+  "q 1 0 0 -1 0 24 cm\n"                                                         \
+  "8.492 7.707 m 8.492 8.535 7.82 9.207 6.992 9.207 c 6.164 9.207 5.492\n"       \
+  "8.535 5.492 7.707 c 5.492 6.879 6.164 6.207 6.992 6.207 c 7.82 6.207\n"       \
+  "8.492 6.879 8.492 7.707 c h\n"                                                \
+  "8.492 7.707 m S Q\n"                                                          \
+  "1 w\n"                                                                        \
+  "0 j\n"                                                                        \
+  "6.93 16.141 m 8 21 14.27 21.5 16 21.5 c 18.094 21.504 19.5 21 19.5 19 c\n"    \
+  "19.5 17.699 20.91 17.418 22.5 17.5 c S\n"
+
+void AnnotFileAttachment::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull()) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+
+    appearBuf->append ("q\n");
+    if (color)
+      setColor(color, gTrue);
+    else
+      appearBuf->append ("1 1 1 rg\n");
+    if (!name->cmp("PushPin"))
+      appearBuf->append (ANNOT_FILE_ATTACHMENT_AP_PUSHPIN);
+    else if (!name->cmp("Paperclip"))
+      appearBuf->append (ANNOT_FILE_ATTACHMENT_AP_PAPERCLIP);
+    else if (!name->cmp("Graph"))
+      appearBuf->append (ANNOT_FILE_ATTACHMENT_AP_GRAPH);
+    else if (!name->cmp("Tag"))
+      appearBuf->append (ANNOT_FILE_ATTACHMENT_AP_TAG);
+    appearBuf->append ("Q\n");
+
+    Object appearDict, obj1, obj2;
+
+    appearDict.initDict(xref);
+    appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    appearDict.dictSet("Subtype", obj1.initName("Form"));
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(24));
+    obj1.arrayAdd(obj2.initReal(24));
+    appearDict.dictSet("BBox", &obj1);
+
+    MemStream *appearStream = new MemStream(copyString(appearBuf->getCString()), 0,
+					    appearBuf->getLength(), &appearDict);
+    appearStream->setNeedFree(gTrue);
+    appearance.initStream(appearStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, border, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
+}
+
 //------------------------------------------------------------------------
 // AnnotSound
 //------------------------------------------------------------------------
@@ -4240,6 +5092,118 @@ void AnnotSound::initialize(XRef *xrefA, Catalog *catalog, Dict* dict) {
     name = new GooString("Speaker");
   }
   obj1.free();
+}
+
+#define ANNOT_SOUND_AP_SPEAKER                                               \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"   \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n" \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                       \
+  "4.301 23 m f\n"                                                           \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                      \
+  "0 J\n"                                                                    \
+  "1 j\n"                                                                    \
+  "[] 0.0 d\n"                                                               \
+  "4 M 4 14 m 4.086 8.043 l 7 8 l 11 4 l 11 18 l 7 14 l 4 14 l h\n"          \
+  "4 14 m S\n"                                                               \
+  "1 w\n"                                                                    \
+  "1 J\n"                                                                    \
+  "0 j\n"                                                                    \
+  "13.699 15.398 m 14.699 13.398 14.699 9.398 13.699 7.398 c S\n"            \
+  "18.199 19.398 m 21.199 17.398 21.199 5.398 18.199 3.398 c S\n"            \
+  "16 17.398 m 18 16.398 18 7.398 16 5.398 c S\n"                            \
+  "0.729412 0.741176 0.713725 RG 2 w\n"                                      \
+  "0 J\n"                                                                    \
+  "1 j\n"                                                                    \
+  "4 15 m 4.086 9.043 l 7 9 l 11 5 l 11 19 l 7 15 l 4 15 l h\n"              \
+  "4 15 m S\n"                                                               \
+  "1 w\n"                                                                    \
+  "1 J\n"                                                                    \
+  "0 j\n"                                                                    \
+  "13.699 16 m 14.699 14 14.699 10 13.699 8 c S\n"                           \
+  "18.199 20 m 21.199 18 21.199 6 18.199 4 c S\n"                            \
+  "16 18 m 18 17 18 8 16 6 c S\n"
+
+#define ANNOT_SOUND_AP_MIC                                                        \
+  "4.301 23 m 19.699 23 l 21.523 23 23 21.523 23 19.699 c 23 4.301 l 23\n"        \
+  "2.477 21.523 1 19.699 1 c 4.301 1 l 2.477 1 1 2.477 1 4.301 c 1 19.699\n"      \
+  "l 1 21.523 2.477 23 4.301 23 c h\n"                                            \
+  "4.301 23 m f\n"                                                                \
+  "0.533333 0.541176 0.521569 RG 2 w\n"                                           \
+  "1 J\n"                                                                         \
+  "0 j\n"                                                                         \
+  "[] 0.0 d\n"                                                                    \
+  "4 M 12 20 m 12 20 l 13.656 20 15 18.656 15 17 c 15 13 l 15 11.344 13.656 10\n" \
+  "12 10 c 12 10 l 10.344 10 9 11.344 9 13 c 9 17 l 9 18.656 10.344 20 12\n"      \
+  "20 c h\n"                                                                      \
+  "12 20 m S\n"                                                                   \
+  "1 w\n"                                                                         \
+  "17.5 14.5 m 17.5 11.973 l 17.5 8.941 15.047 6.5 12 6.5 c 8.953 6.5 6.5\n"      \
+  "8.941 6.5 11.973 c 6.5 14.5 l S\n"                                             \
+  "2 w\n"                                                                         \
+  "0 J\n"                                                                         \
+  "12 6.52 m 12 3 l S\n"                                                          \
+  "1 J\n"                                                                         \
+  "8 3 m 16 3 l S\n"                                                              \
+  "0.729412 0.741176 0.713725 RG 12 21 m 12 21 l 13.656 21 15 19.656 15 18 c\n"   \
+  "15 14 l 15 12.344 13.656 11 12 11 c 12 11 l 10.344 11 9 12.344 9 14 c\n"       \
+  "9 18 l 9 19.656 10.344 21 12 21 c h\n"                                         \
+  "12 21 m S\n"                                                                   \
+  "1 w\n"                                                                         \
+  "17.5 15.5 m 17.5 12.973 l 17.5 9.941 15.047 7.5 12 7.5 c 8.953 7.5 6.5\n"      \
+  "9.941 6.5 12.973 c 6.5 15.5 l S\n"                                             \
+  "2 w\n"                                                                         \
+  "0 J\n"                                                                         \
+  "12 7.52 m 12 4 l S\n"                                                          \
+  "1 J\n"                                                                         \
+  "8 4 m 16 4 l S\n"
+
+void AnnotSound::draw(Gfx *gfx, GBool printing) {
+  Object obj;
+  double ca = 1;
+
+  if (!isVisible (printing))
+    return;
+
+  if (appearance.isNull()) {
+    ca = opacity;
+
+    appearBuf = new GooString ();
+
+    appearBuf->append ("q\n");
+    if (color)
+      setColor(color, gTrue);
+    else
+      appearBuf->append ("1 1 1 rg\n");
+    if (!name->cmp("Speaker"))
+      appearBuf->append (ANNOT_SOUND_AP_SPEAKER);
+    else if (!name->cmp("Mic"))
+      appearBuf->append (ANNOT_SOUND_AP_MIC);
+    appearBuf->append ("Q\n");
+
+    Object appearDict, obj1, obj2;
+
+    appearDict.initDict(xref);
+    appearDict.dictSet("Length", obj1.initInt(appearBuf->getLength()));
+    appearDict.dictSet("Subtype", obj1.initName("Form"));
+    obj1.initArray(xref);
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(0));
+    obj1.arrayAdd(obj2.initReal(24));
+    obj1.arrayAdd(obj2.initReal(24));
+    appearDict.dictSet("BBox", &obj1);
+
+    MemStream *appearStream = new MemStream(copyString(appearBuf->getCString()), 0,
+					    appearBuf->getLength(), &appearDict);
+    appearStream->setNeedFree(gTrue);
+    appearance.initStream(appearStream);
+    delete appearBuf;
+  }
+
+  // draw the appearance stream
+  appearance.fetch(xref, &obj);
+  gfx->drawAnnot(&obj, border, color, ca,
+		 rect->x1, rect->y1, rect->x2, rect->y2);
+  obj.free();
 }
 
 //------------------------------------------------------------------------

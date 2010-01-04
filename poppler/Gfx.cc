@@ -565,6 +565,7 @@ Gfx::Gfx(XRef *xrefA, OutputDev *outA, Dict *resDict, Catalog *catalogA,
   catalog = catalogA;
   subPage = gTrue;
   printCommands = globalParams->getPrintCommands();
+  profileCommands = globalParams->getProfileCommands();
   textHaveCSPattern = gFalse;
   drawText = gFalse;
   maskHaveCSPattern = gFalse;
@@ -4546,7 +4547,7 @@ void Gfx::opMarkPoint(Object args[], int numArgs) {
 // misc
 //------------------------------------------------------------------------
 
-void Gfx::drawAnnot(Object *str, AnnotBorder *border, AnnotColor *aColor,
+void Gfx::drawAnnot(Object *str, AnnotBorder *border, AnnotColor *aColor, double opacity,
 		    double xMin, double yMin, double xMax, double yMax) {
   Dict *dict, *resDict;
   Object matrixObj, bboxObj, resObj;
@@ -4561,6 +4562,13 @@ void Gfx::drawAnnot(Object *str, AnnotBorder *border, AnnotColor *aColor,
   double *dash, *dash2;
   int dashLength;
   int i;
+
+  if (opacity != 1) {
+    state->setFillOpacity(opacity);
+    out->updateFillOpacity(state);
+    state->setStrokeOpacity(opacity);
+    out->updateStrokeOpacity(state);
+  }
 
   //~ can we assume that we're in default user space?
   //~ (i.e., baseMatrix = ctm)
@@ -4675,7 +4683,7 @@ void Gfx::drawAnnot(Object *str, AnnotBorder *border, AnnotColor *aColor,
       out->updateStrokeColorSpace(state);
     }
     if (aColor && (aColor->getSpace() == AnnotColor::colorRGB)) {
-      double *values = aColor->getValues();
+      const double *values = aColor->getValues();
       r = values[0];
       g = values[1];
       b = values[2];

@@ -290,15 +290,14 @@ public:
   AnnotColor(double gray);
   AnnotColor(double r, double g, double b);
   AnnotColor(double c, double m, double y, double k);
-  AnnotColor(Array *array);
-  ~AnnotColor();
+  AnnotColor(Array *array, int adjust = 0);
 
   AnnotColorSpace getSpace() const { return (AnnotColorSpace) length; }
-  double *getValues() const { return values; }
+  const double *getValues() const { return values; }
 
 private:
 
-  double *values;
+  double values[4];
   int length;
 };
 
@@ -534,10 +533,11 @@ private:
 
 
 protected:
-  void setColor(Array *a, GBool fill, int adjust);
+  void setColor(AnnotColor *color, GBool fill);
   void drawCircle(double cx, double cy, double r, GBool fill);
   void drawCircleTopLeft(double cx, double cy, double r);
   void drawCircleBottomRight(double cx, double cy, double r);
+  GBool isVisible(GBool printing);
 
   // Updates the field key of the annotation dictionary
   // and sets M to the current time
@@ -669,6 +669,8 @@ public:
   AnnotText(XRef *xrefA, PDFRectangle *rect, Catalog *catalog);
   AnnotText(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   ~AnnotText();
+
+  virtual void draw(Gfx *gfx, GBool printing);
 
   // getters
   GBool getOpen() const { return open; }
@@ -926,6 +928,8 @@ public:
   AnnotLine(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   ~AnnotLine();
 
+  virtual void draw(Gfx *gfx, GBool printing);
+
   // getters
   AnnotLineEndingStyle getStartStyle() const { return startStyle; }
   AnnotLineEndingStyle getEndStyle() const { return endStyle; }
@@ -980,6 +984,8 @@ public:
   AnnotTextMarkup(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   virtual ~AnnotTextMarkup();
 
+  virtual void draw(Gfx *gfx, GBool printing);
+
   AnnotQuadrilaterals *getQuadrilaterals() const { return quadrilaterals; }
 
 protected:
@@ -1020,6 +1026,8 @@ public:
   AnnotGeometry(XRef *xrefA, PDFRectangle *rect, AnnotSubtype subType, Catalog *catalog);
   AnnotGeometry(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   ~AnnotGeometry();
+
+  virtual void draw(Gfx *gfx, GBool printing);
 
   // getters
   AnnotColor *getInteriorColor() const { return interiorColor; }
@@ -1146,6 +1154,8 @@ public:
   AnnotFileAttachment(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   ~AnnotFileAttachment();
 
+  virtual void draw(Gfx *gfx, GBool printing);
+
   // getters
   Object *getFile() { return &file; }
   GooString *getName() const { return name; }
@@ -1171,6 +1181,8 @@ public:
   AnnotSound(XRef *xrefA, PDFRectangle *rect, Sound *soundA, Catalog *catalog);
   AnnotSound(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj);
   ~AnnotSound();
+
+  virtual void draw(Gfx *gfx, GBool printing);
 
   // getters
   Sound *getSound() { return sound; }
