@@ -32,6 +32,7 @@
 #include <cairo.h>
 #include <cairo-ps.h>
 #include <cairo-pdf.h>
+#include <cairo-svg.h>
 #include "parseargs.h"
 #include "goo/gmem.h"
 #include "goo/GooString.h"
@@ -59,6 +60,7 @@ static GBool useCropBox = gFalse;
 static GBool png = gFalse;
 static GBool ps = gFalse;
 static GBool pdf = gFalse;
+static GBool svg = gFalse;
 static char ownerPassword[33] = "";
 static char userPassword[33] = "";
 static GBool quiet = gFalse;
@@ -103,6 +105,8 @@ static const ArgDesc argDesc[] = {
    "generate PostScript file"},
   {"-pdf",   argFlag,     &pdf,          0,
    "generate a PDF file"},
+  {"-svg",   argFlag,     &svg,          0,
+   "generate a SVG file"},
 
 
   {"-opw",    argString,   ownerPassword,  sizeof(ownerPassword),
@@ -126,37 +130,28 @@ static const ArgDesc argDesc[] = {
 };
 
 
-static void create_surface(char *outFile, cairo_surface_t **surface_out,
-			   GBool *printing_out)
-{
-  char file[OUT_FILE_SZ];
-
-  strcpy(file, outFile);
-  if (png) {
-    *surface_out = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
-    *printing_out = gFalse;
-  } else if (ps) {
-    strcat(file, ".ps");
-    *surface_out = cairo_ps_surface_create (file, w, h);
-    *printing_out = gTrue;
-  } else if (pdf) {
-    strcat(file, ".pdf");
-    *surface_out = cairo_pdf_surface_create (file, w, h);
-    *printing_out = gTrue;
-  }
-}
-
-static void start_page(cairo_surface_t **surface, int w, int h,
+static cairo_surface_t *start_page(char *outFile, int w, int h,
 		       double x_res, double y_res, int rotate)
 {
+  char file[OUT_FILE_SZ];
+  cairo_surface_t *surface;
+
+  strcpy(file, outFile);
+  
   if (png) {
-    cairo_surface_destroy(*surface);
-    *surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
+    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
   } else if (ps) {
-    cairo_ps_surface_set_size(*surface, w, h);
+    strcat(file, ".ps");
+    surface = cairo_ps_surface_create (file, w, h);
   } else if (pdf) {
-    cairo_pdf_surface_set_size(*surface, w, h);
+    strcat(file, ".pdf");
+    surface = cairo_pdf_surface_create (file, w, h);
+  } else if (svg) {
+    strcat(file, ".svg");
+    surface = cairo_svg_surface_create (file, w, h);
   }
+  
+  return surface;
 }
 
 static void end_page(cairo_surface_t *surface, char *outFile)
@@ -167,7 +162,7 @@ static void end_page(cairo_surface_t *surface, char *outFile)
   if (png) {
     strcat(file, ".png");
     cairo_surface_write_to_png (surface, file);
-  } else if (ps || pdf) {
+  } else if (ps || pdf || svg) {
     cairo_surface_show_page(surface);
   }
 }
@@ -270,8 +265,8 @@ int main(int argc, char *argv[]) {
     goto err0;
   }
 
-  if (!png && !ps && !pdf) {
-    fprintf(stderr, "One of -png, -ps, or -pdf must be specified\n");
+  if (!png && !ps && !pdf && !svg) {
+    fprintf(stderr, "One of -png, -ps, -pdf or -svg must be specified\n");
     goto err0;
   }
 
@@ -323,7 +318,6 @@ int main(int argc, char *argv[]) {
   if (sz != 0)
     w = h = sz;
 
-  create_surface(outRoot, &surface, &printing);
   output_dev = new CairoOutputDev ();
   output_dev->startDoc(doc->getXRef (), doc->getCatalog ());
 
@@ -348,8 +342,11 @@ int main(int argc, char *argv[]) {
         y_resolution = (72.0 * y_scaleTo) / pg_h;
       }
     }
+    
+    // Enable printing mode for all output types except PNG
+    printing = (png) ? gFalse : gTrue;
 
-    start_page(&surface, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
+    surface = start_page(outRoot, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
     render_page(output_dev, doc, surface, printing, pg,
 		x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
     snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
