@@ -204,17 +204,17 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
 			!useCropBox, /* Crop */
 			printing,
 			x, y, w, h);
-  cairo_restore (cr);
+  cairo_restore(cr);
 
-  output_dev->setCairo (NULL);
-  output_dev->setTextPage (NULL);
+  output_dev->setCairo(NULL);
+  output_dev->setTextPage(NULL);
 
   if (!printing) {
-    cairo_save (cr);
-    cairo_set_operator (cr, CAIRO_OPERATOR_DEST_OVER);
-    cairo_set_source_rgb (cr, 1, 1, 1);
-    cairo_paint (cr);
-    cairo_restore (cr);
+    cairo_save(cr);
+    cairo_set_operator(cr, CAIRO_OPERATOR_DEST_OVER);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+    cairo_restore(cr);
   }
 
   status = cairo_status(cr);
@@ -318,8 +318,8 @@ int main(int argc, char *argv[]) {
   if (sz != 0)
     w = h = sz;
 
-  output_dev = new CairoOutputDev ();
-  output_dev->startDoc(doc->getXRef (), doc->getCatalog ());
+  output_dev = new CairoOutputDev();
+  output_dev->startDoc(doc->getXRef(), doc->getCatalog());
 
   pg_num_len = (int)ceil(log((double)doc->getNumPages()) / log((double)10));
   for (pg = firstPage; pg <= lastPage; ++pg) {
@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
   cairo_surface_finish(surface);
   status = cairo_surface_status(surface);
   if (status)
-    fprintf(stderr, "cairo error: %s\n", cairo_status_to_string (status));
+    fprintf(stderr, "cairo error: %s\n", cairo_status_to_string(status));
   cairo_surface_destroy(surface);
   delete output_dev;
 
