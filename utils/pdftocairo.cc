@@ -130,25 +130,36 @@ static const ArgDesc argDesc[] = {
 };
 
 
+static void format_output_filename(char *outFile, char *outRoot,
+           int pg_num_len, int pg)
+{
+  snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
+    OUT_FILE_SZ - 32, outRoot, pg_num_len, pg);
+  
+  if (png) {
+    strcat(outFile, ".png");
+  } else if (ps) {
+    strcat(outFile, ".ps");
+  } else if (pdf) {
+    strcat(outFile, ".pdf");
+  } else if (svg) {
+    strcat(outFile, ".svg");
+  }
+}
+
 static cairo_surface_t *start_page(char *outFile, int w, int h,
 		       double x_res, double y_res, int rotate)
 {
-  char file[OUT_FILE_SZ];
   cairo_surface_t *surface;
-
-  strcpy(file, outFile);
   
   if (png) {
-    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
   } else if (ps) {
-    strcat(file, ".ps");
-    surface = cairo_ps_surface_create (file, w, h);
+    surface = cairo_ps_surface_create(outFile, w, h);
   } else if (pdf) {
-    strcat(file, ".pdf");
-    surface = cairo_pdf_surface_create (file, w, h);
+    surface = cairo_pdf_surface_create(outFile, w, h);
   } else if (svg) {
-    strcat(file, ".svg");
-    surface = cairo_svg_surface_create (file, w, h);
+    surface = cairo_svg_surface_create(outFile, w, h);
   }
   
   return surface;
@@ -156,12 +167,8 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
 
 static void end_page(cairo_surface_t *surface, char *outFile)
 {
-  char file[OUT_FILE_SZ];
-
-  strcpy(file, outFile);
   if (png) {
-    strcat(file, ".png");
-    cairo_surface_write_to_png (surface, file);
+    cairo_surface_write_to_png(surface, outFile);
   } else if (ps || pdf || svg) {
     cairo_surface_show_page(surface);
   }
@@ -231,7 +238,7 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
 int main(int argc, char *argv[]) {
   PDFDoc *doc;
   GooString *fileName = NULL;
-  char *outRoot;
+  char *outRoot = NULL;
   char outFile[OUT_FILE_SZ];
   GooString *ownerPW, *userPW;
   GBool ok;
@@ -270,15 +277,14 @@ int main(int argc, char *argv[]) {
     goto err0;
   }
 
-  fileName = new GooString(argv[1]);
-  if (argc == 3)
+  if (argc > 1) fileName = new GooString(argv[1]);
+  if (argc == 3) {
     outRoot = strdup(argv[2]);
-  else
-    outRoot = strdup(argv[1]);
 
-  p = strrchr(outRoot, '.');
-  if (p)
-    *p = 0;
+    p = strrchr(outRoot, '.');
+    if (p)
+      *p = 0;
+  }
 
   // read config file
   globalParams = new GlobalParams();
@@ -345,12 +351,12 @@ int main(int argc, char *argv[]) {
     
     // Enable printing mode for all output types except PNG
     printing = (png) ? gFalse : gTrue;
+    
+    format_output_filename(outFile, outRoot, pg_num_len, pg);
 
-    surface = start_page(outRoot, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
+    surface = start_page(outFile, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
     render_page(output_dev, doc, surface, printing, pg,
 		x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
-    snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
-	     OUT_FILE_SZ - 32, outRoot, pg_num_len, pg);
     end_page(surface, outFile);
   }
   cairo_surface_finish(surface);
