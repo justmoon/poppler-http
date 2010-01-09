@@ -130,9 +130,18 @@ static const ArgDesc argDesc[] = {
 };
 
 
-static void format_output_filename(char *outFile, char *outRoot,
+cairo_status_t write_to_stdout(void *closure, const unsigned char *data, unsigned int length)
+{
+  int result = fwrite(data, 1, length, stdout);
+  
+  return (result == length) ? CAIRO_STATUS_SUCCESS : CAIRO_STATUS_WRITE_ERROR;
+}
+
+static char *format_output_filename(char *outRoot,
            int pg_num_len, int pg)
 {
+  char *outFile = (char*)malloc(OUT_FILE_SZ);
+
   snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
     OUT_FILE_SZ - 32, outRoot, pg_num_len, pg);
   
@@ -145,6 +154,8 @@ static void format_output_filename(char *outFile, char *outRoot,
   } else if (svg) {
     strcat(outFile, ".svg");
   }
+  
+  return outFile;
 }
 
 static cairo_surface_t *start_page(char *outFile, int w, int h,
@@ -154,12 +165,22 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
   
   if (png) {
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
-  } else if (ps) {
-    surface = cairo_ps_surface_create(outFile, w, h);
-  } else if (pdf) {
-    surface = cairo_pdf_surface_create(outFile, w, h);
-  } else if (svg) {
-    surface = cairo_svg_surface_create(outFile, w, h);
+  } else if (outFile != NULL) {
+    if (ps) {
+      surface = cairo_ps_surface_create(outFile, w, h);
+    } else if (pdf) {
+      surface = cairo_pdf_surface_create(outFile, w, h);
+    } else if (svg) {
+      surface = cairo_svg_surface_create(outFile, w, h);
+    }
+  } else {
+    if (ps) {
+      surface = cairo_ps_surface_create_for_stream(&write_to_stdout, NULL, w, h);
+    } else if (pdf) {
+      surface = cairo_pdf_surface_create_for_stream(&write_to_stdout, NULL, w, h);
+    } else if (svg) {
+      surface = cairo_svg_surface_create_for_stream(&write_to_stdout, NULL, w, h);
+    }
   }
   
   return surface;
@@ -168,7 +189,11 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
 static void end_page(cairo_surface_t *surface, char *outFile)
 {
   if (png) {
-    cairo_surface_write_to_png(surface, outFile);
+    if (outFile != NULL) {
+      cairo_surface_write_to_png(surface, outFile);
+    } else {
+      cairo_surface_write_to_png_stream(surface, &write_to_stdout, NULL);
+    }
   } else if (ps || pdf || svg) {
     cairo_surface_show_page(surface);
   }
@@ -239,7 +264,7 @@ int main(int argc, char *argv[]) {
   PDFDoc *doc;
   GooString *fileName = NULL;
   char *outRoot = NULL;
-  char outFile[OUT_FILE_SZ];
+  char *outFile;
   GooString *ownerPW, *userPW;
   GBool ok;
   int exitCode;
@@ -352,12 +377,16 @@ int main(int argc, char *argv[]) {
     // Enable printing mode for all output types except PNG
     printing = (png) ? gFalse : gTrue;
     
-    format_output_filename(outFile, outRoot, pg_num_len, pg);
+    // Determine filename (adds page number and correct format)
+    if (outRoot != NULL) outFile = format_output_filename(outRoot, pg_num_len, pg);
+    else outFile = NULL; // NULL means stdout
 
     surface = start_page(outFile, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
     render_page(output_dev, doc, surface, printing, pg,
 		x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
     end_page(surface, outFile);
+    
+    if (outFile != NULL) free(outFile);
   }
   cairo_surface_finish(surface);
   status = cairo_surface_status(surface);
