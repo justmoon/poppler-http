@@ -15,6 +15,9 @@
 /* Build against libpng. */
 #cmakedefine ENABLE_LIBPNG 1
 
+/* Do not hardcode the library location */
+#cmakedefine ENABLE_RELOCATABLE 1
+
 /* Use zlib instead of builtin zlib decoder. */
 #cmakedefine ENABLE_ZLIB 1
 
@@ -52,6 +55,9 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #cmakedefine HAVE_INTTYPES_H 1
 
+/* Define to 1 if you have the `openjpeg' library (-lopenjpeg). */
+#cmakedefine HAVE_LIBOPENJPEG 1
+
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ 1
 
@@ -70,8 +76,14 @@
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 #cmakedefine HAVE_NDIR_H 1
 
+/* Define to 1 if you have the <openjpeg.h> header file. */
+#cmakedefine HAVE_OPENJPEG_H 1
+
 /* Define to 1 if you have the `popen' function. */
 #cmakedefine HAVE_POPEN 1
+
+/* Define if you have POSIX threads libraries and header files. */
+#cmakedefine HAVE_PTHREAD 1
 
 /* Use splash for rendering. */
 #cmakedefine HAVE_SPLASH 1
@@ -88,13 +100,15 @@
 /* Define to 1 if you have the <string.h> header file. */
 #cmakedefine HAVE_STRING_H 1
 
-/* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'. */
+/* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
+   */
 #cmakedefine HAVE_SYS_DIR_H 1
 
 /* Define to 1 if you have the <sys/mman.h> header file. */
 #cmakedefine HAVE_SYS_MMAN_H 1
 
-/* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'. */
+/* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'.
+   */
 #cmakedefine HAVE_SYS_NDIR_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
@@ -108,9 +122,6 @@
 
 /* Define to 1 if you have the <zlib.h> header file. */
 #cmakedefine HAVE_ZLIB_H 1
-
-/* Define to 1 if gdk was found */
-#cmakedefine POPPLER_WITH_GDK 1
 
 /* Enable multithreading support. */
 #cmakedefine MULTITHREADED 1
@@ -142,6 +153,9 @@
 /* Poppler data dir */
 #define POPPLER_DATADIR "${CMAKE_INSTALL_PREFIX}/share/poppler"
 
+/* Have GDK */
+#cmakedefine POPPLER_WITH_GDK 1
+
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
@@ -154,11 +168,20 @@
 /* Throw exceptions to deal with not enough memory and similar problems */
 #cmakedefine USE_EXCEPTIONS 1
 
-/* Use fixed point arithmetic */
+/* Use fixed point arithmetic in the Splash backend */
 #cmakedefine USE_FIXEDPOINT 1
+
+/* Use single precision arithmetic in the Splash backend */
+#cmakedefine USE_FLOAT 1
 
 /* Version number of package */
 #define VERSION "${POPPLER_VERSION}"
+
+/* Use fontconfig font configuration backend */
+#cmakedefine WITH_FONTCONFIGURATION_FONTCONFIG 1
+
+/* Use win32 font configuration backend */
+#cmakedefine WITH_FONTCONFIGURATION_WIN32 1
 
 /* Define to 1 if the X Window System is missing or not being used. */
 /* #undef X_DISPLAY_MISSING */

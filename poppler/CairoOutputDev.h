@@ -17,7 +17,7 @@
 // Copyright (C) 2005-2008 Jeff Muizelaar <jeff@infidigm.net>
 // Copyright (C) 2005, 2006 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2005 Nickolay V. Shmyrev <nshmyrev@yandex.ru>
-// Copyright (C) 2006-2009 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2006-2010 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2008, 2009 Adrian Johnson <ajohnson@redneon.com>
 // Copyright (C) 2008 Michael Vrable <mvrable@cs.ucsd.edu>
 //
@@ -156,6 +156,7 @@ public:
   virtual void stroke(GfxState *state);
   virtual void fill(GfxState *state);
   virtual void eoFill(GfxState *state);
+  virtual void clipToStrokePath(GfxState *state);
   virtual GBool tilingPatternFill(GfxState *state, Object *str,
 				  int paintType, Dict *resDict,
 				  double *mat, double *bbox,
@@ -268,6 +269,7 @@ public:
 
 protected:
   void doPath(cairo_t *cairo, GfxState *state, GfxPath *path);
+  cairo_surface_t *downscaleSurface(cairo_surface_t *orig_surface);
   
   GfxRGB fill_color, stroke_color;
   cairo_pattern_t *fill_pattern, *stroke_pattern;

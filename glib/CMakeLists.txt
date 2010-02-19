@@ -4,23 +4,20 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
-if (CAIRO_FOUND)
-  include_directories(${CAIRO_INCLUDES})
-  set (CAIRO_FEATURE "#define POPPLER_HAS_CAIRO 1")
-  add_definitions(${CAIRO_CFLAGS})
-else (CAIRO_FOUND)
-  set (CAIRO_FEATURE "#undef POPPLER_HAS_CAIRO")
-endif (CAIRO_FOUND)
+include_directories(${CAIRO_INCLUDES})
+set (CAIRO_FEATURE "#define POPPLER_HAS_CAIRO 1")
+add_definitions(${CAIRO_CFLAGS})
 
 if (GDK_FOUND)
+  set (GDK_FEATURE "#define POPPLER_WITH_GDK 1")
   add_definitions(${GDK2_CFLAGS})
 endif (GDK_FOUND)
 
 configure_file(poppler-features.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/poppler-features.h @ONLY)
 
-if (GTK_FOUND)
+if (GTK_FOUND AND BUILD_GTK_TESTS)
   add_subdirectory(demo)
-endif (GTK_FOUND)
+endif (GTK_FOUND AND BUILD_GTK_TESTS)
 
 set(poppler_glib_public_headers
   poppler-action.h
@@ -30,6 +27,7 @@ set(poppler_glib_public_headers
   poppler-attachment.h
   poppler-form-field.h
   poppler-annot.h
+  poppler-layer.h
   poppler.h
 )
 
@@ -85,19 +83,13 @@ set(poppler_glib_SRCS
   poppler-layer.cc
   poppler.cc
   ${CMAKE_CURRENT_BINARY_DIR}/poppler-enums.c
+  ${CMAKE_SOURCE_DIR}/poppler/CairoFontEngine.cc
+  ${CMAKE_SOURCE_DIR}/poppler/CairoOutputDev.cc
+  ${CMAKE_SOURCE_DIR}/poppler/CairoRescaleBox.cc
 )
-if (CAIRO_FOUND)
-  set(poppler_glib_SRCS ${poppler_glib_SRCS}
-    ${CMAKE_SOURCE_DIR}/poppler/CairoFontEngine.cc
-    ${CMAKE_SOURCE_DIR}/poppler/CairoOutputDev.cc
-  )
-endif (CAIRO_FOUND)
 add_library(poppler-glib SHARED ${poppler_glib_SRCS})
 set_target_properties(poppler-glib PROPERTIES VERSION 4.0.0 SOVERSION 4)
-target_link_libraries(poppler-glib poppler ${GLIB2_LIBRARIES})
-if (CAIRO_FOUND)
-  target_link_libraries(poppler-glib ${CAIRO_LIBRARIES})
-endif (CAIRO_FOUND)
+target_link_libraries(poppler-glib poppler ${GLIB2_LIBRARIES} ${CAIRO_LIBRARIES})
 install(TARGETS poppler-glib RUNTIME DESTINATION bin LIBRARY DESTINATION lib${LIB_SUFFIX} ARCHIVE DESTINATION lib${LIB_SUFFIX})
 
 install(FILES
@@ -107,11 +99,11 @@ install(FILES
   DESTINATION include/poppler/glib)
 
 
-if (GDK_FOUND)
+if (GDK_FOUND AND BUILD_GTK_TESTS)
   set(test_poppler_glib_SRCS
     test-poppler-glib.cc
   )
   poppler_add_test(test-poppler-glib BUILD_GTK_TESTS ${test_poppler_glib_SRCS})
   target_link_libraries(test-poppler-glib poppler-glib ${GDK2_LIBRARIES})
-endif (GDK_FOUND)
+endif (GDK_FOUND AND BUILD_GTK_TESTS)
 

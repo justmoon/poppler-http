@@ -47,7 +47,9 @@ libpoppler_cairo_la_SOURCES =			\
 	CairoFontEngine.cc			\
 	CairoFontEngine.h			\
 	CairoOutputDev.cc			\
-	CairoOutputDev.h
+	CairoOutputDev.h			\
+	CairoRescaleBox.cc			\
+	CairoRescaleBox.h
 
 endif
 
@@ -159,7 +161,7 @@ libpoppler_la_LIBADD =				\
 	$(PTHREAD_LIBS)				\
 	$(win32_libs)
 
-libpoppler_la_LDFLAGS = -version-info 5:0:0 @create_shared_lib@
+libpoppler_la_LDFLAGS = -version-info 6:0:0 @create_shared_lib@
 
 if ENABLE_XPDF_HEADERS
 

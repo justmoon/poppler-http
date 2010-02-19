@@ -5,11 +5,14 @@
 // This file is licensed under the GPLv2 or later
 //
 // Copyright (C) 2009 Koji Otani <sho@bbr.jp>
-// Copyright (C) 2009 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2009, 2010 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2010 Carlos Garcia Campos <carlosgc@gnome.org>
 //
 //========================================================================
 
 #include "PopplerCache.h"
+
+#include "XRef.h"
 
 PopplerCacheKey::~PopplerCacheKey()
 {
@@ -99,4 +102,62 @@ PopplerCacheItem *PopplerCache::item(int index)
 PopplerCacheKey *PopplerCache::key(int index)
 {
   return keys[index];
+}
+
+class ObjectKey : public PopplerCacheKey {
+  public:
+    ObjectKey(int numA, int genA) : num(numA), gen(genA)
+    {
+    }
+
+    bool operator==(const PopplerCacheKey &key) const
+    {
+      const ObjectKey *k = static_cast<const ObjectKey*>(&key);
+      return k->num == num && k->gen == gen;
+    }
+
+    int num, gen;
+};
+
+class ObjectItem : public PopplerCacheItem {
+  public:
+    ObjectItem(Object *obj)
+    {
+      obj->copy(&item);
+    }
+
+    ~ObjectItem()
+    {
+      item.free();
+    }
+
+    Object item;
+};
+
+PopplerObjectCache::PopplerObjectCache(int cacheSize, XRef *xrefA) {
+  cache = new PopplerCache (cacheSize);
+  xref = xrefA;
+}
+
+PopplerObjectCache::~PopplerObjectCache() {
+  delete cache;
+}
+
+Object *PopplerObjectCache::put(const Ref &ref) {
+  Object obj;
+  xref->fetch(ref.num, ref.gen, &obj);
+
+  ObjectKey *key = new ObjectKey(ref.num, ref.gen);
+  ObjectItem *item = new ObjectItem(&obj);
+  cache->put(key, item);
+  obj.free();
+
+  return &item->item;
+}
+
+Object *PopplerObjectCache::lookup(const Ref &ref, Object *obj) {
+  ObjectKey key(ref.num, ref.gen);
+  ObjectItem *item = static_cast<ObjectItem *>(cache->lookup(key));
+
+  return item ? item->item.copy(obj) : obj->initNull();
 }

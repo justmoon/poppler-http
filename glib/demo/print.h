@@ -1,5 +1,5 @@
-/* poppler-features.h: glib interface to poppler
- * Copyright (C) 2006, Red Hat, Inc.
+/*
+ * Copyright (C) 2009 Carlos Garcia Campos  <carlosgc@gnome.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,19 +16,16 @@
  * Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef __POPPLER_FEATURES_H__
-#define __POPPLER_FEATURES_H__
+#include <gtk/gtk.h>
+#include <poppler.h>
 
-@GDK_FEATURE@
-@CAIRO_FEATURE@
+#ifndef _PRINT_H_
+#define _PRINT_H_
 
-#define POPPLER_MAJOR_VERSION (@POPPLER_MAJOR_VERSION@)
-#define POPPLER_MINOR_VERSION (@POPPLER_MINOR_VERSION@)
-#define POPPLER_MICRO_VERSION (@POPPLER_MICRO_VERSION@)
+G_BEGIN_DECLS
 
-#define POPPLER_CHECK_VERSION(major,minor,micro) \
-  (POPPLER_MAJOR_VERSION > (major) || \
-   (POPPLER_MAJOR_VERSION == (major) && POPPLER_MINOR_VERSION > (minor)) || \
-   (POPPLER_MAJOR_VERSION == (major) && POPPLER_MINOR_VERSION == (minor) && POPPLER_MICRO_VERSION >= (micro)))
+GtkWidget *pgd_print_create_widget (PopplerDocument *document);
 
-#endif /* __POPPLER_FEATURES_H__ */
+G_END_DECLS
+
+#endif /* _PRINT_H_ */

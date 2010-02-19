@@ -13,7 +13,7 @@
 // All changes made under the Poppler project to this file are licensed
 // under GPL version 2 or later
 //
-// Copyright (C) 2005, 2007-2009 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2005, 2007-2010 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2005 Jonathan Blandford <jrb@redhat.com>
 // Copyright (C) 2006 Takashi Iwai <tiwai@suse.de>
 // Copyright (C) 2006 Kristian Høgsberg <krh@redhat.com>
@@ -21,6 +21,7 @@
 // Copyright (C) 2009 Jonathan Kew <jonathan_kew@sil.org>
 // Copyright (C) 2009 Petr Gajdos <pgajdos@novell.com>
 // Copyright (C) 2009 William Bader <williambader@hotmail.com>
+// Copyright (C) 2010 Hib Eris <hib@hiberis.nl>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -37,7 +38,7 @@
 #include <assert.h>
 #include "poppler-config.h"
 #include <stdio.h>
-#ifndef _MSC_VER
+#if WITH_FONTCONFIGURATION_FONTCONFIG
 #include <fontconfig/fontconfig.h>
 #endif
 #include "goo/gtypes.h"
@@ -169,7 +170,7 @@ public:
 
   void setBaseDir(char *dir);
 
-#ifdef _MSC_VER
+#if WITH_FONTCONFIGURATION_WIN32
   void setupBaseFonts(char *dir);
 #endif
 
@@ -352,10 +353,6 @@ private:
   UnicodeMapCache *unicodeMapCache;
   CMapCache *cMapCache;
   
-#ifndef _MSC_VER
-  FcConfig *FCcfg;
-#endif
-
 #ifdef ENABLE_PLUGINS
   GList *plugins;		// list of plugins [Plugin]
   GList *securityHandlers;	// list of loaded security handlers
