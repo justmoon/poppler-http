@@ -912,6 +912,11 @@ void CachedFileStream::moveStart(int delta)
   bufPos = start;
 }
 
+void CachedFileStream::preload(const GooVector<ByteRange> &ranges)
+{
+  cc->cache(ranges);
+}
+
 //------------------------------------------------------------------------
 // MemStream
 //------------------------------------------------------------------------
