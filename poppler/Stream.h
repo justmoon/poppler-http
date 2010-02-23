@@ -303,6 +303,7 @@ public:
   virtual Stream *getUndecodedStream() { return this; }
   virtual Dict *getDict() { return dict.getDict(); }
   virtual GooString *getFileName() { return NULL; }
+  virtual void preload(const GooVector<ByteRange> &ranges) {}
   virtual Guint getLength() { return length; }
 
   // Get/set position of first byte of stream within the file.
@@ -458,6 +459,7 @@ public:
   virtual void setPos(Guint pos, int dir = 0);
   virtual Guint getStart() { return start; }
   virtual void moveStart(int delta);
+  virtual void preload(const GooVector<ByteRange> &ranges);
 
   virtual int getUnfilteredChar () { return getChar(); }
   virtual void unfilteredReset () { reset(); }
