@@ -160,7 +160,8 @@ typedef int SplashError;
 
 enum SplashImageFileFormat {
   splashFormatJpeg,
-  splashFormatPng
+  splashFormatPng,
+  splashFormatPngAlpha
 };
 
 #endif

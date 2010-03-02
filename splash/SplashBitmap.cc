@@ -286,11 +286,16 @@ SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, char *fileN
 
 SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, FILE *f, int hDPI, int vDPI) {
   ImgWriter *writer;
+  SplashError e;
   
   switch (format) {
     #ifdef ENABLE_LIBPNG
     case splashFormatPng:
-	  writer = new PNGWriter();
+      writer = new PNGWriter();
+      break;
+      
+    case splashFormatPngAlpha:
+      writer = new PNGWriter(gTrue);
       break;
     #endif
 
@@ -316,7 +321,27 @@ SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, FILE *f, in
     delete writer;
     return splashErrGeneric;
   }
+  
+  if (format != splashFormatPngAlpha) {
+    e = writeImgDataRGB(writer);
+  } else {
+    e = writeImgDataRGBA(writer);
+  }
+  
+  if (e) return e;
+  
+  if (writer->close()) {
+    delete writer;
+    return splashErrGeneric;
+  }
 
+  delete writer;
+
+  return splashOk;
+}
+
+SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
+{
   switch (mode) {
     case splashModeRGB8:
     {
@@ -383,13 +408,98 @@ SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, FILE *f, in
     // can't happen
     break;
   }
-  
-  if (writer->close()) {
-    delete writer;
-    return splashErrGeneric;
+}
+
+
+SplashError SplashBitmap::writeImgDataRGBA(ImgWriter *writer)
+{
+  unsigned char *row = new unsigned char[4 * width];
+      
+  switch (mode) {
+    case splashModeRGB8:
+    {
+      for (int y = 0; y < height; y++) {
+        // Convert into a PNG row
+        for (int x = 0; x < width; x++) {
+          row[4*x] = data[y * rowSize + 3*x];
+          row[4*x+1] = data[y * rowSize + 3*x + 1];
+          row[4*x+2] = data[y * rowSize + 3*x + 2];
+          row[4*x+3] = alpha[y * width + x];
+        }
+
+        if (!writer->writeRow(&row)) {
+          delete[] row;
+          delete writer;
+          return splashErrGeneric;
+        }
+      }
+    }
+    break;
+    
+    case splashModeXBGR8:
+    {
+      for (int y = 0; y < height; y++) {
+        // Convert into a PNG row
+        for (int x = 0; x < width; x++) {
+          row[4*x] = data[y * rowSize + x * 4 + 2];
+          row[4*x+1] = data[y * rowSize + x * 4 + 1];
+          row[4*x+2] = data[y * rowSize + x * 4];
+          row[4*x+3] = alpha[y * width + x];
+        }
+
+        if (!writer->writeRow(&row)) {
+          delete[] row;
+          delete writer;
+          return splashErrGeneric;
+        }
+      }
+    }
+    break;
+    
+    case splashModeMono8:
+    {
+      for (int y = 0; y < height; y++) {
+        // Convert into a PNG row
+        for (int x = 0; x < width; x++) {
+          row[4*x] = data[y * rowSize + x];
+          row[4*x+1] = data[y * rowSize + x];
+          row[4*x+2] = data[y * rowSize + x];
+          row[4*x+3] = alpha[y * width + x];
+        }
+
+        if (!writer->writeRow(&row)) {
+          delete[] row;
+          delete writer;
+          return splashErrGeneric;
+        }
+      }
+    }
+    break;
+    
+    case splashModeMono1:
+    {
+      for (int y = 0; y < height; y++) {
+        // Convert into a PNG row
+        for (int x = 0; x < width; x++) {
+          getPixel(x, y, &row[4*x]);
+          row[4*x+1] = row[4*x];
+          row[4*x+2] = row[4*x];
+          row[4*x+3] = alpha[y * width + x];
+        }
+
+        if (!writer->writeRow(&row)) {
+          delete[] row;
+          delete writer;
+          return splashErrGeneric;
+        }
+      }
+    }
+    break;
+    
+    default:
+    // can't happen
+    break;
   }
-
-  delete writer;
-
-  return splashOk;
+  
+  delete[] row;
 }
