@@ -16,6 +16,7 @@
 
 #include <config.h>
 #include <stdio.h>
+#include "goo/gtypes.h"
 	
 class ImgWriter
 {
@@ -27,6 +28,8 @@ class ImgWriter
 		virtual bool writeRow(unsigned char **row) = 0;
 		
 		virtual bool close() = 0;
+		
+		virtual GBool hasAlpha() = 0;
 };
 
 #endif

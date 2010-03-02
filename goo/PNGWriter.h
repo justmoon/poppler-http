@@ -22,11 +22,12 @@
 #include <cstdio>
 #include <png.h>
 #include "ImgWriter.h"
+#include "gtypes.h"
 
 class PNGWriter : public ImgWriter
 {
 	public:
-		PNGWriter();
+		PNGWriter(GBool withAlphaChannel = gFalse);
 		~PNGWriter();
 		
 		bool init(FILE *f, int width, int height, int hDPI, int vDPI);
@@ -35,10 +36,13 @@ class PNGWriter : public ImgWriter
 		bool writeRow(unsigned char **row);
 		
 		bool close();
+		
+		GBool hasAlpha();
 	
 	private:
 		png_structp png_ptr;
 		png_infop info_ptr;
+		GBool withAlphaChannel;
 };
 
 #endif

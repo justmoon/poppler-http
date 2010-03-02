@@ -18,8 +18,9 @@
 
 #include "poppler/Error.h"
 
-PNGWriter::PNGWriter()
+PNGWriter::PNGWriter(GBool withAlphaChannel)
 {
+	this->withAlphaChannel = withAlphaChannel;
 }
 
 PNGWriter::~PNGWriter()
@@ -59,7 +60,7 @@ bool PNGWriter::init(FILE *f, int width, int height, int hDPI, int vDPI)
 	png_set_compression_level(png_ptr, Z_BEST_COMPRESSION);
 
 	png_byte bit_depth = 8;
-	png_byte color_type = PNG_COLOR_TYPE_RGB;
+	png_byte color_type = (withAlphaChannel) ? PNG_COLOR_TYPE_RGB_ALPHA : PNG_COLOR_TYPE_RGB;
 	png_byte interlace_type = PNG_INTERLACE_NONE;
 
 	png_set_IHDR(png_ptr, info_ptr, width, height, bit_depth, color_type, interlace_type, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
@@ -110,6 +111,11 @@ bool PNGWriter::close()
 	}
 	
 	return true;
+}
+
+GBool PNGWriter::hasAlpha()
+{
+	return withAlphaChannel;
 }
 
 #endif

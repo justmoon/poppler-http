@@ -39,6 +39,8 @@ class JpegWriter : public ImgWriter
 		bool writeRow(unsigned char **row);
 		
 		bool close();
+		
+		GBool hasAlpha() { return gFalse; }
 	
 	private:
 		bool progressive;
