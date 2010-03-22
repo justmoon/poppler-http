@@ -21,7 +21,7 @@
 
 #include <cstdio>
 #include <png.h>
-#include "ImgWriter.h"
+#include "goo/ImgWriter.h"
 #include "goo/gtypes.h"
 
 class PNGWriter : public ImgWriter

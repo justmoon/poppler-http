@@ -30,6 +30,7 @@
 #endif
 
 #include "SplashTypes.h"
+#include "goo/ImgWriter.h"
 #include <stdio.h>
 
 //------------------------------------------------------------------------
@@ -67,6 +68,9 @@ public:
   Guchar getAlpha(int x, int y);
 
 private:
+
+  SplashError writeImgDataRGB(ImgWriter *writer);
+  SplashError writeImgDataRGBA(ImgWriter *writer);
 
   int width, height;		// size of bitmap
   int rowSize;			// size of one row of data, in bytes
