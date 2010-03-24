@@ -53,6 +53,7 @@
 #include "Catalog.h"
 #include "Stream.h"
 #include "XRef.h"
+#include "Linearization.h"
 #include "Link.h"
 #include "OutputDev.h"
 #include "Error.h"
@@ -83,6 +84,7 @@ void PDFDoc::init()
   file = NULL;
   str = NULL;
   xref = NULL;
+  linearization = NULL;
   catalog = NULL;
 #ifndef DISABLE_OUTLINE
   outline = NULL;
@@ -242,6 +244,9 @@ PDFDoc::~PDFDoc() {
   }
   if (xref) {
     delete xref;
+  }
+  if (linearization) {
+    delete linearization;
   }
   if (str) {
     delete str;
@@ -412,6 +417,14 @@ Links *PDFDoc::getLinks(int page) {
   
 void PDFDoc::processLinks(OutputDev *out, int page) {
   catalog->getPage(page)->processLinks(out, catalog);
+}
+
+Linearization *PDFDoc::getLinearization()
+{
+  if (!linearization) {
+    linearization = new Linearization(str);
+  }
+  return linearization;
 }
 
 GBool PDFDoc::isLinearized() {

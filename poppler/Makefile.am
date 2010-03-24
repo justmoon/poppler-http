@@ -209,6 +209,7 @@ poppler_include_HEADERS =	\
 	JArithmeticDecoder.h	\
 	JBIG2Stream.h		\
 	Lexer.h			\
+	Linearization.h 	\
 	Link.h			\
 	LocalPDFDocBuilder.h	\
 	Movie.h                 \
@@ -287,6 +288,7 @@ libpoppler_la_SOURCES =		\
 	JArithmeticDecoder.cc	\
 	JBIG2Stream.cc		\
 	Lexer.cc 		\
+	Linearization.cc 	\
 	Link.cc 		\
 	LocalPDFDocBuilder.cc	\
 	Movie.cc                \

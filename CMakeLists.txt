@@ -249,6 +249,7 @@ set(poppler_SRCS
   poppler/JBIG2Stream.cc
   poppler/Lexer.cc
   poppler/Link.cc
+  poppler/Linearization.cc
   poppler/LocalPDFDocBuilder.cc
   poppler/NameToCharCode.cc
   poppler/Object.cc
@@ -395,6 +396,7 @@ if(ENABLE_XPDF_HEADERS)
     poppler/JBIG2Stream.h
     poppler/Lexer.h
     poppler/Link.h
+    poppler/Linearization.h
     poppler/LocalPDFDocBuilder.h
     poppler/Movie.h
     poppler/NameToCharCode.h
