@@ -446,34 +446,11 @@ Linearization *PDFDoc::getLinearization()
 }
 
 GBool PDFDoc::isLinearized() {
-  Parser *parser;
-  Object obj1, obj2, obj3, obj4, obj5;
-  GBool lin;
-
-  lin = gFalse;
-  obj1.initNull();
-  parser = new Parser(xref,
-	     new Lexer(xref,
-	       str->makeSubStream(str->getStart(), gFalse, 0, &obj1)),
-	     gTrue);
-  parser->getObj(&obj1);
-  parser->getObj(&obj2);
-  parser->getObj(&obj3);
-  parser->getObj(&obj4);
-  if (obj1.isInt() && obj2.isInt() && obj3.isCmd("obj") &&
-      obj4.isDict()) {
-    obj4.dictLookup("Linearized", &obj5);
-    if (obj5.isNum() && obj5.getNum() > 0) {
-      lin = gTrue;
-    }
-    obj5.free();
-  }
-  obj4.free();
-  obj3.free();
-  obj2.free();
-  obj1.free();
-  delete parser;
-  return lin;
+  if ((str->getLength()) &&
+      (getLinearization()->getLength() == str->getLength()))
+    return gTrue;
+  else
+    return gFalse;
 }
 
 int PDFDoc::saveAs(GooString *name, PDFWriteMode mode) {
