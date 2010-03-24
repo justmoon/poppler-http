@@ -45,6 +45,7 @@
 #ifdef _WIN32
 #  include <windows.h>
 #endif
+#include <sys/stat.h>
 #include "goo/gstrtod.h"
 #include "goo/GooString.h"
 #include "poppler-config.h"
@@ -99,11 +100,17 @@ PDFDoc::PDFDoc()
 PDFDoc::PDFDoc(GooString *fileNameA, GooString *ownerPassword,
 	       GooString *userPassword, void *guiDataA) {
   Object obj;
+  int size = 0;
 
   init();
 
   fileName = fileNameA;
   guiData = guiDataA;
+
+  struct stat buf;
+  if (stat(fileName->getCString(), &buf) == 0) {
+     size = buf.st_size;
+  }
 
   // try to open file
 #ifdef VMS
@@ -124,7 +131,7 @@ PDFDoc::PDFDoc(GooString *fileNameA, GooString *ownerPassword,
 
   // create stream
   obj.initNull();
-  str = new FileStream(file, 0, gFalse, 0, &obj);
+  str = new FileStream(file, 0, gFalse, size, &obj);
 
   ok = setup(ownerPassword, userPassword);
 }
@@ -155,11 +162,19 @@ PDFDoc::PDFDoc(wchar_t *fileNameA, int fileNameLen, GooString *ownerPassword,
 
   // try to open file
   // NB: _wfopen is only available in NT
+  struct stat buf;
+  int size;
   version.dwOSVersionInfoSize = sizeof(version);
   GetVersionEx(&version);
   if (version.dwPlatformId == VER_PLATFORM_WIN32_NT) {
+    if (_wstat(fileName2, &buf) == 0) {
+      size = buf.st_size;
+    }
     file = _wfopen(fileName2, L"rb");
   } else {
+    if (_wstat(fileName->getCString(), &buf) == 0) {
+      size = buf.st_size;
+    }
     file = fopen(fileName->getCString(), "rb");
   }
   if (!file) {
@@ -170,7 +185,7 @@ PDFDoc::PDFDoc(wchar_t *fileNameA, int fileNameLen, GooString *ownerPassword,
 
   // create stream
   obj.initNull();
-  str = new FileStream(file, 0, gFalse, 0, &obj);
+  str = new FileStream(file, 0, gFalse, size, &obj);
 
   ok = setup(ownerPassword, userPassword);
 }
