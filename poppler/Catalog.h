@@ -148,7 +148,7 @@ public:
   GBool isOk() { return ok; }
 
   // Get number of pages.
-  int getNumPages() { return numPages; }
+  int getNumPages();
 
   // Get a page.
   Page *getPage(int i);
