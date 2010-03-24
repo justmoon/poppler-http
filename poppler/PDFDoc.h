@@ -48,6 +48,7 @@ class Links;
 class LinkAction;
 class LinkDest;
 class Outline;
+class Linearization;
 
 enum PDFWriteMode {
   writeStandard,
@@ -88,6 +89,9 @@ public:
 
   // Get file name.
   GooString *getFileName() { return fileName; }
+
+  // Get the linearization table.
+  Linearization *getLinearization();
 
   // Get the xref table.
   XRef *getXRef() { return xref; }
@@ -242,6 +246,7 @@ private:
   void *guiData;
   int pdfMajorVersion;
   int pdfMinorVersion;
+  Linearization *linearization;
   XRef *xref;
   Catalog *catalog;
 #ifndef DISABLE_OUTLINE
