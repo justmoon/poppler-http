@@ -50,6 +50,7 @@ class LinkDest;
 class Outline;
 class Linearization;
 class SecurityHandler;
+class Hints;
 
 enum PDFWriteMode {
   writeStandard,
@@ -237,6 +238,9 @@ private:
   void saveIncrementalUpdate (OutStream* outStr);
   void saveCompleteRewrite (OutStream* outStr);
 
+  // Get hints.
+  Hints *getHints();
+
   PDFDoc();
   void init();
   GBool setup(GooString *ownerPassword, GooString *userPassword);
@@ -260,6 +264,7 @@ private:
   XRef *xref;
   SecurityHandler *secHdlr;
   Catalog *catalog;
+  Hints *hints;
 #ifndef DISABLE_OUTLINE
   Outline *outline;
 #endif

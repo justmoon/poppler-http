@@ -68,6 +68,7 @@
 #include "Outline.h"
 #endif
 #include "PDFDoc.h"
+#include "Hints.h"
 
 //------------------------------------------------------------------------
 
@@ -95,6 +96,7 @@ void PDFDoc::init()
   xref = NULL;
   linearization = NULL;
   catalog = NULL;
+  hints = NULL;
 #ifndef DISABLE_OUTLINE
   outline = NULL;
 #endif
@@ -270,6 +272,9 @@ PDFDoc::~PDFDoc() {
   }
   if (xref) {
     delete xref;
+  }
+  if (hints) {
+    delete hints;
   }
   if (linearization) {
     delete linearization;
@@ -468,6 +473,15 @@ GBool PDFDoc::isLinearized() {
     return gTrue;
   else
     return gFalse;
+}
+
+Hints *PDFDoc::getHints()
+{
+  if (!hints && isLinearized()) {
+    hints = new Hints(str, getLinearization(), getXRef(), secHdlr);
+  }
+
+  return hints;
 }
 
 int PDFDoc::saveAs(GooString *name, PDFWriteMode mode) {

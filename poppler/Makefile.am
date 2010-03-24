@@ -206,6 +206,7 @@ poppler_include_HEADERS =	\
 	GfxState.h		\
 	GfxState_helpers.h	\
 	GlobalParams.h		\
+	Hints.h			\
 	JArithmeticDecoder.h	\
 	JBIG2Stream.h		\
 	Lexer.h			\
@@ -285,6 +286,7 @@ libpoppler_la_SOURCES =		\
 	GfxFont.cc 		\
 	GfxState.cc		\
 	GlobalParams.cc		\
+	Hints.cc		\
 	JArithmeticDecoder.cc	\
 	JBIG2Stream.cc		\
 	Lexer.cc 		\
