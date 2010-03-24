@@ -64,7 +64,8 @@ Catalog::Catalog(XRef *xrefA) {
   xref = xrefA;
   pages = NULL;
   pageRefs = NULL;
-  numPages = pagesSize = 0;
+  numPages = -1;
+  pagesSize = 0;
   baseURI = NULL;
   pageLabelInfo = NULL;
   form = NULL;
@@ -88,27 +89,6 @@ Catalog::Catalog(XRef *xrefA) {
   }
   // get the AcroForm dictionary
   catDict.dictLookup("AcroForm", &acroForm);
-
-  // read page tree
-  catDict.dictLookup("Pages", &pagesDict);
-  // This should really be isDict("Pages"), but I've seen at least one
-  // PDF file where the /Type entry is missing.
-  if (!pagesDict.isDict()) {
-    error(-1, "Top-level pages object is wrong type (%s)",
-	  pagesDict.getTypeName());
-    goto err2;
-  }
-  pagesDict.dictLookup("Count", &obj);
-  // some PDF files actually use real numbers here ("/Count 9.0")
-  if (!obj.isNum()) {
-    error(-1, "Page count in top-level pages object is wrong type (%s)",
-	  obj.getTypeName());
-    numPages = 0;
-  } else {
-    numPages = (int)obj.getNum();
-  }
-  obj.free();
-  pagesDict.free();
 
   // read base URI
   if (catDict.dictLookup("URI", &obj)->isDict()) {
@@ -136,8 +116,6 @@ Catalog::Catalog(XRef *xrefA) {
   catDict.free();
   return;
 
- err2:
-  pagesDict.free();
  err1:
   catDict.free();
   ok = gFalse;
@@ -277,7 +255,7 @@ GBool Catalog::cachePageTree(int page)
       return gFalse;
     }
 
-    pagesSize = numPages;
+    pagesSize = getNumPages();
     pages = (Page **)gmallocn(pagesSize, sizeof(Page *));
     pageRefs = (Ref *)gmallocn(pagesSize, sizeof(Ref));
     for (int i = 0; i < pagesSize; ++i) {
@@ -402,7 +380,7 @@ GBool Catalog::cachePageTree(int page)
 int Catalog::findPage(int num, int gen) {
   int i;
 
-  for (i = 0; i < numPages; ++i) {
+  for (i = 0; i < getNumPages(); ++i) {
     Ref *ref = getPageRef(i+1);
     if (ref->num == num && ref->gen == gen)
       return i + 1;
@@ -722,7 +700,7 @@ GBool Catalog::labelToIndex(GooString *label, int *index)
       return gFalse;
   }
 
-  if (*index < 0 || *index >= numPages)
+  if (*index < 0 || *index >= getNumPages())
     return gFalse;
 
   return gTrue;
@@ -732,7 +710,7 @@ GBool Catalog::indexToLabel(int index, GooString *label)
 {
   char buffer[32];
 
-  if (index < 0 || index >= numPages)
+  if (index < 0 || index >= getNumPages())
     return gFalse;
 
   PageLabelInfo *pli = getPageLabelInfo();
@@ -846,6 +824,42 @@ EmbFile::EmbFile(Object *efDict, GooString *description)
     m_checksum = new GooString();
   if (!m_mimetype)
     m_mimetype = new GooString();
+}
+
+int Catalog::getNumPages()
+{
+  if (numPages == -1)
+  {
+    Object catDict, pagesDict, obj;
+
+    xref->getCatalog(&catDict);
+    catDict.dictLookup("Pages", &pagesDict);
+    catDict.free();
+
+    // This should really be isDict("Pages"), but I've seen at least one
+    // PDF file where the /Type entry is missing.
+    if (!pagesDict.isDict()) {
+      error(-1, "Top-level pages object is wrong type (%s)",
+          pagesDict.getTypeName());
+      pagesDict.free();
+      return 0;
+    }
+
+    pagesDict.dictLookup("Count", &obj);
+    // some PDF files actually use real numbers here ("/Count 9.0")
+    if (!obj.isNum()) {
+      error(-1, "Page count in top-level pages object is wrong type (%s)",
+         obj.getTypeName());
+      numPages = 0;
+    } else {
+      numPages = (int)obj.getNum();
+    }
+
+    obj.free();
+    pagesDict.free();
+  }
+
+  return numPages;
 }
 
 PageLabelInfo *Catalog::getPageLabelInfo()
