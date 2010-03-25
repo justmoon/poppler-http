@@ -118,7 +118,7 @@ public:
     { return getPage(page) ? getPage(page)->getRotate() : 0 ; }
 
   // Get number of pages.
-  int getNumPages() { return catalog->getNumPages(); }
+  int getNumPages();
 
   // Return the contents of the metadata stream, or NULL if there is
   // no metadata.
