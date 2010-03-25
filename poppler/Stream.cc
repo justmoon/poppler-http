@@ -874,7 +874,7 @@ GBool CachedFileStream::fillBuf()
   if (limited && bufPos + cachedStreamBufSize > start + length) {
     n = start + length - bufPos;
   } else {
-    n = cachedStreamBufSize;
+    n = cachedStreamBufSize - (bufPos % cachedStreamBufSize);
   }
   cc->read(buf, 1, n);
   bufEnd = buf + n;
