@@ -49,6 +49,7 @@
 #include <sys/stat.h>
 #include "goo/gstrtod.h"
 #include "goo/GooString.h"
+#include "goo/GooVector.h"
 #include "poppler-config.h"
 #include "GlobalParams.h"
 #include "Page.h"
@@ -1067,6 +1068,14 @@ int PDFDoc::getNumPages()
   }
 }
 
+GooVector<ByteRange>* PDFDoc::getPageRanges(int page)
+{
+  Hints *hints = getHints();
+  if (!hints) return NULL;
+
+  return getHints()->getPageRanges(page);
+}
+
 Guint PDFDoc::getPageOffset(int page)
 {
   if (isLinearized() && (page-1 == getLinearization()->getPageFirst())) {
@@ -1086,6 +1095,13 @@ Page *PDFDoc::parsePage(Guint offset, int page)
 {
   Page *p = NULL;
   Object obj;
+
+  // preload page data
+  GooVector<ByteRange>* r = getPageRanges(page);
+  if (r) {
+    str->preload(*r);
+    delete r;
+  }
 
   obj.initNull();
   Stream *stream = str->makeSubStream(offset, gFalse, 0, &obj);

@@ -40,6 +40,8 @@
 #include "Page.h"
 #include "Annot.h"
 #include "OptionalContent.h"
+#include "Stream.h"
+#include "goo/GooVector.h"
 
 class GooString;
 class BaseStream;
@@ -242,6 +244,7 @@ private:
 
   // Get hints.
   Hints *getHints();
+  GooVector<ByteRange>* getPageRanges(int page);
 
   PDFDoc();
   void init();
