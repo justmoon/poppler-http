@@ -1032,6 +1032,15 @@ Guint PDFDoc::getMainXRefEntriesOffset()
   return mainXRefEntriesOffset;
 }
 
+int PDFDoc::getNumPages()
+{
+  if (isLinearized()) {
+    return getLinearization()->getNumPages();
+  } else {
+    return catalog->getNumPages();
+  }
+}
+
 Page *PDFDoc::getPage(int page)
 {
   if ((page < 1) || page > getNumPages()) return NULL;
