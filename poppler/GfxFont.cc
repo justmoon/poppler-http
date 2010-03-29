@@ -264,16 +264,15 @@ void GfxFont::readFontDescriptor(XRef *xref, Dict *fontDict) {
     // get weight
     obj1.dictLookup("FontWeight", &obj2);
     if (obj2.isNum()) {
-      if (obj2.getNum() == 100) weight = W100;
-      else if (obj2.getNum() == 200) weight = W200;
-      else if (obj2.getNum() == 300) weight = W300;
-      else if (obj2.getNum() == 400) weight = W400;
-      else if (obj2.getNum() == 500) weight = W500;
-      else if (obj2.getNum() == 600) weight = W600;
-      else if (obj2.getNum() == 700) weight = W700;
-      else if (obj2.getNum() == 800) weight = W800;
-      else if (obj2.getNum() == 900) weight = W900;
-      else error(-1, "Invalid Font Weight");
+      if (obj2.getNum() <= 150) weight = W100;
+      else if (obj2.getNum() <= 250) weight = W200;
+      else if (obj2.getNum() <= 350) weight = W300;
+      else if (obj2.getNum() <= 450) weight = W400;
+      else if (obj2.getNum() <= 550) weight = W500;
+      else if (obj2.getNum() <= 650) weight = W600;
+      else if (obj2.getNum() <= 750) weight = W700;
+      else if (obj2.getNum() <= 850) weight = W800;
+      else weight = W900;
     }
     obj2.free();
 
