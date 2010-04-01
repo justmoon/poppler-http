@@ -330,7 +330,7 @@ SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, FILE *f, in
   
   if (e) return e;
   
-  if (writer->close()) {
+  if (!writer->close()) {
     delete writer;
     return splashErrGeneric;
   }
