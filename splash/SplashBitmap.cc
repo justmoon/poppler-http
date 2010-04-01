@@ -329,14 +329,8 @@ SplashError SplashBitmap::writeImgFile(SplashImageFileFormat format, FILE *f, in
   }
   
   if (e) return e;
-  
-  if (!writer->close()) {
-    delete writer;
-    return splashErrGeneric;
-  }
 
   delete writer;
-
   return splashOk;
 }
 
@@ -358,6 +352,13 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
         delete writer;
         return splashErrGeneric;
       }
+      
+      // Finalize writer before freeing memory
+      if (!writer->close()) {
+        delete writer;
+        return splashErrGeneric;
+      }
+      
       delete[] row_pointers;
     }
     break;
@@ -379,6 +380,13 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
           return splashErrGeneric;
         }
       }
+      
+      // Finalize writer before freeing memory
+      if (!writer->close()) {
+        delete writer;
+        return splashErrGeneric;
+      }
+      
       delete[] row;
     }
     break;
@@ -400,6 +408,13 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
           return splashErrGeneric;
         }
       }
+      
+      // Finalize writer before freeing memory
+      if (!writer->close()) {
+        delete writer;
+        return splashErrGeneric;
+      }
+      
       delete[] row;
     }
     break;
@@ -499,6 +514,12 @@ SplashError SplashBitmap::writeImgDataRGBA(ImgWriter *writer)
     default:
     // can't happen
     break;
+  }
+  
+  // Finalize writer before freeing memory
+  if (!writer->close()) {
+    delete writer;
+    return splashErrGeneric;
   }
   
   delete[] row;
