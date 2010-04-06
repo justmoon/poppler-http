@@ -258,7 +258,7 @@ Object *ObjectStream::getObject(int objIdx, int objNum, Object *obj) {
 // XRef
 //------------------------------------------------------------------------
 
-XRef::XRef() {
+void XRef::init() {
   ok = gTrue;
   errCode = errNone;
   entries = NULL;
@@ -268,17 +268,15 @@ XRef::XRef() {
   objStrs = new PopplerCache(5);
 }
 
+XRef::XRef() {
+  init();
+}
+
 XRef::XRef(BaseStream *strA, GBool *wasReconstructed, GBool reconstruct) {
   Guint pos;
   Object obj;
 
-  ok = gTrue;
-  errCode = errNone;
-  size = 0;
-  entries = NULL;
-  streamEnds = NULL;
-  streamEndsLen = 0;
-  objStrs = new PopplerCache(5);
+  init();
 
   encrypted = gFalse;
   permFlags = defPermFlags;

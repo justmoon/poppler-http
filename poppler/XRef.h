@@ -157,6 +157,7 @@ private:
   Guchar fileKey[16];		// file decryption key
   GBool ownerPasswordOk;	// true if owner password is correct
 
+  void init();
   Guint getStartXref();
   GBool readXRef(Guint *pos, GooVector<Guint> *followedXRefStm);
   GBool readXRefTable(Parser *parser, Guint *pos, GooVector<Guint> *followedXRefStm);
