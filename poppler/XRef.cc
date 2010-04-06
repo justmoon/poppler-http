@@ -258,7 +258,7 @@ Object *ObjectStream::getObject(int objIdx, int objNum, Object *obj) {
 // XRef
 //------------------------------------------------------------------------
 
-XRef::XRef() {
+void XRef::init() {
   ok = gTrue;
   errCode = errNone;
   entries = NULL;
@@ -266,6 +266,10 @@ XRef::XRef() {
   streamEnds = NULL;
   streamEndsLen = 0;
   objStrs = new PopplerCache(5);
+}
+
+XRef::XRef() {
+  init();
 }
 
 XRef::XRef(BaseStream *strA) {
