@@ -262,6 +262,7 @@ void XRef::init() {
   ok = gTrue;
   errCode = errNone;
   entries = NULL;
+  capacity = 0;
   size = 0;
   streamEnds = NULL;
   streamEndsLen = 0;
@@ -348,6 +349,56 @@ XRef::~XRef() {
   if (objStrs) {
     delete objStrs;
   }
+}
+
+int XRef::reserve(int newSize)
+{
+  if (newSize > capacity) {
+
+    int realNewSize;
+    for (realNewSize = capacity ? 2 * capacity : 1024;
+          newSize > realNewSize && realNewSize > 0;
+          realNewSize <<= 1) ;
+    if ((realNewSize < 0) ||
+        (realNewSize >= INT_MAX / (int)sizeof(XRefEntry))) {
+      return 0;
+    }
+
+    void *p = greallocn_checkoverflow(entries, realNewSize, sizeof(XRefEntry));
+    if (p == NULL) {
+      return 0;
+    }
+
+    entries = (XRefEntry *) p;
+    capacity = realNewSize;
+
+  }
+
+  return capacity;
+}
+
+int XRef::resize(int newSize)
+{
+  if (newSize > size) {
+
+    if (reserve(newSize) < newSize) return size;
+
+    for (int i = size; i < newSize; ++i) {
+      entries[i].offset = 0xffffffff;
+      entries[i].type = xrefEntryFree;
+      entries[i].obj.initNull ();
+      entries[i].updated = false;
+      entries[i].gen = 0;
+    }
+  } else {
+    for (int i = newSize; i < size; i++) {
+      entries[i].obj.free ();
+    }
+  }
+
+  size = newSize;
+
+  return size;
 }
 
 // Read the 'startxref' position.
@@ -437,7 +488,7 @@ GBool XRef::readXRefTable(Parser *parser, Guint *pos, GooVector<Guint> *followed
   GBool more;
   Object obj, obj2;
   Guint pos2;
-  int first, n, newSize, i;
+  int first, n, i;
 
   while (1) {
     parser->getObj(&obj);
@@ -456,29 +507,13 @@ GBool XRef::readXRefTable(Parser *parser, Guint *pos, GooVector<Guint> *followed
     n = obj.getInt();
     obj.free();
     if (first < 0 || n < 0 || first + n < 0) {
-      goto err1;
+      goto err0;
     }
     if (first + n > size) {
-      for (newSize = size ? 2 * size : 1024;
-	   first + n > newSize && newSize > 0;
-	   newSize <<= 1) ;
-      if (newSize < 0) {
-	goto err1;
-      }
-      if (newSize >= INT_MAX / (int)sizeof(XRefEntry)) {
+      if (resize(first + n) != first + n) {
         error(-1, "Invalid 'obj' parameters'");
-        goto err1;
+        goto err0;
       }
- 
-      entries = (XRefEntry *)greallocn(entries, newSize, sizeof(XRefEntry));
-      for (i = size; i < newSize; ++i) {
-	entries[i].offset = 0xffffffff;
-	entries[i].type = xrefEntryFree;
-	entries[i].obj.initNull ();
-	entries[i].updated = false;
-	entries[i].gen = 0;
-      }
-      size = newSize;
     }
     for (i = first; i < first + n; ++i) {
       if (!parser->getObj(&obj)->isInt()) {
@@ -567,6 +602,7 @@ GBool XRef::readXRefTable(Parser *parser, Guint *pos, GooVector<Guint> *followed
 
  err1:
   obj.free();
+ err0:
   ok = gFalse;
   return gFalse;
 }
@@ -589,19 +625,10 @@ GBool XRef::readXRefStream(Stream *xrefStr, Guint *pos) {
     goto err1;
   }
   if (newSize > size) {
-    if (newSize >= INT_MAX / (int)sizeof(XRefEntry)) {
-      error(-1, "Invalid 'size' parameter.");
-      return gFalse;
+    if (resize(newSize) != newSize) {
+      error(-1, "Invalid 'size' parameter");
+      goto err0;
     }
-    entries = (XRefEntry *)greallocn(entries, newSize, sizeof(XRefEntry));
-    for (i = size; i < newSize; ++i) {
-      entries[i].offset = 0xffffffff;
-      entries[i].type = xrefEntryFree;
-      entries[i].obj.initNull ();
-      entries[i].updated = false;
-      entries[i].gen = 0;
-    }
-    size = newSize;
   }
 
   if (!dict->lookupNF("W", &obj)->isArray() ||
@@ -674,31 +701,16 @@ GBool XRef::readXRefStream(Stream *xrefStr, Guint *pos) {
 
 GBool XRef::readXRefStreamSection(Stream *xrefStr, int *w, int first, int n) {
   Guint offset;
-  int type, gen, c, newSize, i, j;
+  int type, gen, c, i, j;
 
   if (first + n < 0) {
     return gFalse;
   }
   if (first + n > size) {
-    for (newSize = size ? 2 * size : 1024;
-	 first + n > newSize && newSize > 0;
-	 newSize <<= 1) ;
-    if (newSize < 0) {
+    if (resize(first + n) != size) {
+      error(-1, "Invalid 'size' inside xref table");
       return gFalse;
     }
-    if (newSize >= INT_MAX / (int)sizeof(XRefEntry)) {
-      error(-1, "Invalid 'size' inside xref table.");
-      return gFalse;
-    }
-    entries = (XRefEntry *)greallocn(entries, newSize, sizeof(XRefEntry));
-    for (i = size; i < newSize; ++i) {
-      entries[i].offset = 0xffffffff;
-      entries[i].type = xrefEntryFree;
-      entries[i].obj.initNull ();
-      entries[i].updated = false;
-      entries[i].gen = 0;
-    }
-    size = newSize;
   }
   for (i = first; i < first + n; ++i) {
     if (w[0] == 0) {
@@ -759,13 +771,13 @@ GBool XRef::constructXRef() {
   int newSize;
   int streamEndsSize;
   char *p;
-  int i;
   GBool gotRoot;
   char* token = NULL;
   bool oneCycle = true;
   int offset = 0;
 
   gfree(entries);
+  capacity = 0;
   size = 0;
   entries = NULL;
 
@@ -847,23 +859,10 @@ GBool XRef::constructXRef() {
 		      error(-1, "Bad object number");
 		      return gFalse;
 		    }
-		    if (newSize >= INT_MAX / (int)sizeof(XRefEntry)) {
-		      error(-1, "Invalid 'obj' parameters.");
+		    if (resize(newSize) != newSize) {
+		      error(-1, "Invalid 'obj' parameters");
 		      return gFalse;
 		    }
-		    entries = (XRefEntry *)
-		        greallocn_checkoverflow(entries, newSize, sizeof(XRefEntry));
-		    if (entries == NULL) {
-		      size = 0;
-		      return gFalse;
-		    }
-		    for (i = size; i < newSize; ++i) {
-		      entries[i].offset = 0xffffffff;
-		      entries[i].type = xrefEntryFree;
-		      entries[i].obj.initNull ();
-		      entries[i].updated = false;
-		    }
-		    size = newSize;
 		  }
 		  if (entries[num].type == xrefEntryFree ||
 		      gen >= entries[num].gen) {
@@ -1152,7 +1151,10 @@ Guint XRef::strToUnsigned(char *s) {
 
 void XRef::add(int num, int gen, Guint offs, GBool used) {
   if (num >= size) {
-    entries = (XRefEntry *)greallocn(entries, num + 1, sizeof(XRefEntry));
+    if (num >= capacity) {
+      entries = (XRefEntry *)greallocn(entries, num + 1, sizeof(XRefEntry));
+      capacity = num + 1;
+    }
     for (int i = size; i < num + 1; ++i) {
       entries[i].offset = 0xffffffff;
       entries[i].type = xrefEntryFree;
