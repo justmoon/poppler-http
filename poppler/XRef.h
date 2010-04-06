@@ -138,7 +138,8 @@ private:
   Guint start;			// offset in file (to allow for garbage
 				//   at beginning of file)
   XRefEntry *entries;		// xref entries
-  int size;			// size of <entries> array
+  int capacity;			// size of <entries> array
+  int size;			// number of entries
   int rootNum, rootGen;		// catalog dict
   GBool ok;			// true if xref table is valid
   int errCode;			// error code (if <ok> is false)
@@ -158,6 +159,8 @@ private:
   GBool ownerPasswordOk;	// true if owner password is correct
 
   void init();
+  int reserve(int newSize);
+  int resize(int newSize);
   Guint getStartXref();
   GBool readXRef(Guint *pos, GooVector<Guint> *followedXRefStm);
   GBool readXRefTable(Parser *parser, Guint *pos, GooVector<Guint> *followedXRefStm);
