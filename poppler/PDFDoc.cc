@@ -74,6 +74,10 @@
 #define headerSearchSize 1024	// read this many bytes at beginning of
 				//   file to look for '%PDF'
 
+#define linearizationSearchSize 1024	// read this many bytes at beginning of
+					// file to look for linearization
+					// dictionary
+
 #define xrefSearchSize 1024	// read this many bytes at end of file
 				//   to look for 'startxref'
 
@@ -950,7 +954,28 @@ Guint PDFDoc::getStartXRef()
 {
   if (startXRefPos == ~(Guint)0) {
 
-    {
+    if (isLinearized()) {
+      char buf[linearizationSearchSize+1];
+      int c, n, i;
+
+      str->setPos(0);
+      for (n = 0; n < linearizationSearchSize; ++n) {
+        if ((c = str->getChar()) == EOF) {
+          break;
+        }
+        buf[n] = c;
+      }
+      buf[n] = '\0';
+
+      // find end of first obj
+      startXRefPos = 0;
+      for (i = 0; i < n; i++) {
+        if (!strncmp("endobj", &buf[i], 6)) {
+           startXRefPos = i+6;
+           break;
+        }
+      }
+    } else {
       char buf[xrefSearchSize+1];
       char *p;
       int c, n, i;
