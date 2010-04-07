@@ -35,6 +35,7 @@
 #pragma implementation
 #endif
 
+#include <ctype.h>
 #include <locale.h>
 #include <stdio.h>
 #include <errno.h>
@@ -73,8 +74,9 @@
 #define headerSearchSize 1024	// read this many bytes at beginning of
 				//   file to look for '%PDF'
 
-//------------------------------------------------------------------------
-// PDFDoc
+#define xrefSearchSize 1024	// read this many bytes at end of file
+				//   to look for 'startxref'
+
 //------------------------------------------------------------------------
 
 void PDFDoc::init()
@@ -90,6 +92,7 @@ void PDFDoc::init()
 #ifndef DISABLE_OUTLINE
   outline = NULL;
 #endif
+  startXRefPos = ~(Guint)0;
 }
 
 PDFDoc::PDFDoc()
@@ -223,7 +226,7 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
   checkHeader();
 
   // read xref table
-  xref = new XRef(str);
+  xref = new XRef(str, getStartXRef());
   if (!xref->isOk()) {
     error(-1, "Couldn't read xref table");
     errCode = xref->getErrorCode();
@@ -891,7 +894,7 @@ void PDFDoc::writeTrailer (Guint uxrefOffset, int uxrefSize, OutStream* outStr, 
   trailerDict->set("Root", &obj1);
 
   if (incrUpdate) { 
-    obj1.initInt(xref->getLastXRefPos());
+    obj1.initInt(getStartXRef());
     trailerDict->set("Prev", &obj1);
   }
   
@@ -929,3 +932,55 @@ PDFDoc *PDFDoc::ErrorPDFDoc(int errorCode, GooString *fileNameA)
 
   return doc;
 }
+
+Guint PDFDoc::strToUnsigned(char *s) {
+  Guint x;
+  char *p;
+  int i;
+
+  x = 0;
+  for (p = s, i = 0; *p && isdigit(*p) && i < 10; ++p, ++i) {
+    x = 10 * x + (*p - '0');
+  }
+  return x;
+}
+
+// Read the 'startxref' position.
+Guint PDFDoc::getStartXRef()
+{
+  if (startXRefPos == ~(Guint)0) {
+
+    {
+      char buf[xrefSearchSize+1];
+      char *p;
+      int c, n, i;
+
+      // read last xrefSearchSize bytes
+      str->setPos(xrefSearchSize, -1);
+      for (n = 0; n < xrefSearchSize; ++n) {
+        if ((c = str->getChar()) == EOF) {
+          break;
+        }
+        buf[n] = c;
+      }
+      buf[n] = '\0';
+
+      // find startxref
+      for (i = n - 9; i >= 0; --i) {
+        if (!strncmp(&buf[i], "startxref", 9)) {
+          break;
+        }
+      }
+      if (i < 0) {
+        startXRefPos = 0;
+      }
+      for (p = &buf[i+9]; isspace(*p); ++p) ;
+      startXRefPos =  strToUnsigned(p);
+    }
+
+  }
+
+  return startXRefPos;
+}
+
+

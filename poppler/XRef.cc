@@ -48,11 +48,6 @@
 #include "PopplerCache.h"
 
 //------------------------------------------------------------------------
-
-#define xrefSearchSize 1024	// read this many bytes at end of file
-				//   to look for 'startxref'
-
-//------------------------------------------------------------------------
 // Permission bits
 // Note that the PDF spec uses 1 base (eg bit 3 is 1<<2)
 //------------------------------------------------------------------------
@@ -273,7 +268,7 @@ XRef::XRef() {
   init();
 }
 
-XRef::XRef(BaseStream *strA) {
+XRef::XRef(BaseStream *strA, Guint pos) {
   Object obj;
 
   ok = gTrue;
@@ -410,37 +405,6 @@ int XRef::resize(int newSize)
   size = newSize;
 
   return size;
-}
-
-// Read the 'startxref' position.
-Guint XRef::getStartXref() {
-  char buf[xrefSearchSize+1];
-  char *p;
-  int c, n, i;
-
-  // read last xrefSearchSize bytes
-  str->setPos(xrefSearchSize, -1);
-  for (n = 0; n < xrefSearchSize; ++n) {
-    if ((c = str->getChar()) == EOF) {
-      break;
-    }
-    buf[n] = c;
-  }
-  buf[n] = '\0';
-
-  // find startxref
-  for (i = n - 9; i >= 0; --i) {
-    if (!strncmp(&buf[i], "startxref", 9)) {
-      break;
-    }
-  }
-  if (i < 0) {
-    return 0;
-  }
-  for (p = &buf[i+9]; isspace(*p); ++p) ;
-  lastXRefPos = strToUnsigned(p);
-
-  return lastXRefPos;
 }
 
 // Read one xref table section.  Also reads the associated trailer
@@ -1146,18 +1110,6 @@ int XRef::getNumEntry(Guint offset)
     return res;
   }
   else return -1;
-}
-
-Guint XRef::strToUnsigned(char *s) {
-  Guint x;
-  char *p;
-  int i;
-
-  x = 0;
-  for (p = s, i = 0; *p && isdigit(*p) && i < 10; ++p, ++i) {
-    x = 10 * x + (*p - '0');
-  }
-  return x;
 }
 
 void XRef::add(int num, int gen, Guint offs, GBool used) {

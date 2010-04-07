@@ -64,7 +64,7 @@ public:
   // Constructor, create an empty XRef, used for PDF writing
   XRef();
   // Constructor.  Read xref table from stream.
-  XRef(BaseStream *strA);
+  XRef(BaseStream *strA, Guint pos);
 
   // Destructor.
   ~XRef();
@@ -107,9 +107,6 @@ public:
   // Return the number of objects in the xref table.
   int getNumObjects() { return size; }
 
-  // Return the offset of the last xref table.
-  Guint getLastXRefPos() { return lastXRefPos; }
-
   // Return the catalog object reference.
   int getRootNum() { return rootNum; }
   int getRootGen() { return rootGen; }
@@ -144,7 +141,6 @@ private:
   GBool ok;			// true if xref table is valid
   int errCode;			// error code (if <ok> is false)
   Object trailerDict;		// trailer dictionary
-  Guint lastXRefPos;		// offset of last xref table
   Guint *streamEnds;		// 'endstream' positions - only used in
 				//   damaged files
   int streamEndsLen;		// number of valid entries in streamEnds
