@@ -239,6 +239,9 @@ private:
   GBool checkFooter();
   void checkHeader();
   GBool checkEncryption(GooString *ownerPassword, GooString *userPassword);
+  // Get the offset of the start xref table.
+  Guint getStartXRef();
+  Guint strToUnsigned(char *s);
 
   GooString *fileName;
   FILE *file;
@@ -258,6 +261,8 @@ private:
   //If there is an error opening the PDF file with fopen() in the constructor, 
   //then the POSIX errno will be here.
   int fopenErrno;
+
+  Guint startXRefPos;		// offset of last xref table
 };
 
 #endif
