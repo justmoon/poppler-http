@@ -118,7 +118,7 @@ public:
   GBool getStreamEnd(Guint streamStart, Guint *streamEnd);
 
   // Retuns the entry that belongs to the offset
-  int getNumEntry(Guint offset) const;
+  int getNumEntry(Guint offset);
 
   // Direct access.
   int getSize() { return size; }
