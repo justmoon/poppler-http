@@ -984,7 +984,7 @@ Object *XRef::fetch(int num, int gen, Object *obj) {
     goto err;
   }
 
-  e = &entries[num];
+  e = getEntry(num);
   if(!e->obj.isNull ()) { //check for updated object
     obj = e->obj.copy(obj);
     return obj;
@@ -1116,20 +1116,20 @@ GBool XRef::getStreamEnd(Guint streamStart, Guint *streamEnd) {
   return gTrue;
 }
 
-int XRef::getNumEntry(Guint offset) const
+int XRef::getNumEntry(Guint offset)
 {
   if (size > 0)
   {
     int res = 0;
-    Guint resOffset = entries[0].offset;
-    XRefEntry e;
+    Guint resOffset = getEntry(0)->offset;
+    XRefEntry *e;
     for (int i = 1; i < size; ++i)
     {
-      e = entries[i];
-      if (e.offset < offset && e.offset >= resOffset)
+      e = getEntry(i);
+      if (e->offset < offset && e->offset >= resOffset)
       {
         res = i;
-        resOffset = e.offset;
+        resOffset = e->offset;
       }
     }
     return res;
@@ -1164,7 +1164,7 @@ void XRef::add(int num, int gen, Guint offs, GBool used) {
     }
     size = num + 1;
   }
-  XRefEntry *e = &entries[num];
+  XRefEntry *e = getEntry(num);
   e->gen = gen;
   e->obj.initNull ();
   e->updated = false;
@@ -1182,25 +1182,26 @@ void XRef::setModifiedObject (Object* o, Ref r) {
     error(-1,"XRef::setModifiedObject on unknown ref: %i, %i\n", r.num, r.gen);
     return;
   }
-  entries[r.num].obj.free();
-  o->copy(&entries[r.num].obj);
-  entries[r.num].updated = true;
+  XRefEntry *e = getEntry(r.num);
+  e->obj.free();
+  o->copy(&(e->obj));
+  e->updated = true;
 }
 
 Ref XRef::addIndirectObject (Object* o) {
   int entryIndexToUse = -1;
   for (int i = 1; entryIndexToUse == -1 && i < size; ++i) {
-    if (entries[i].type == xrefEntryFree) entryIndexToUse = i;
+    if (getEntry(i)->type == xrefEntryFree) entryIndexToUse = i;
   }
 
   XRefEntry *e;
   if (entryIndexToUse == -1) {
     entryIndexToUse = size;
     add(entryIndexToUse, 0, 0, gFalse);
-    e = &entries[entryIndexToUse];
+    e = getEntry(entryIndexToUse);
   } else {
     //reuse a free entry
-    e = &entries[entryIndexToUse];
+    e = getEntry(entryIndexToUse);
     //we don't touch gen number, because it should have been 
     //incremented when the object was deleted
   }
@@ -1216,13 +1217,13 @@ Ref XRef::addIndirectObject (Object* o) {
 
 void XRef::writeToFile(OutStream* outStr, GBool writeAllEntries) {
   //create free entries linked-list
-  if (entries[0].gen != 65535) {
+  if (getEntry(0)->gen != 65535) {
     error(-1, "XRef::writeToFile, entry 0 of the XRef is invalid (gen != 65535)\n");
   }
   int lastFreeEntry = 0;
   for (int i=0; i<size; i++) {
-    if (entries[i].type == xrefEntryFree) {
-      entries[lastFreeEntry].offset = i;
+    if (getEntry(i)->type == xrefEntryFree) {
+      getEntry(lastFreeEntry)->offset = i;
       lastFreeEntry = i;
     }
   }
@@ -1232,10 +1233,10 @@ void XRef::writeToFile(OutStream* outStr, GBool writeAllEntries) {
     outStr->printf("xref\r\n");
     outStr->printf("%i %i\r\n", 0, size);
     for (int i=0; i<size; i++) {
-      XRefEntry &e = entries[i];
+      XRefEntry *e = getEntry(i);
 
-      if(e.gen > 65535) e.gen = 65535; //cap generation number to 65535 (required by PDFReference)
-      outStr->printf("%010i %05i %c\r\n", e.offset, e.gen, (e.type==xrefEntryFree)?'f':'n');
+      if(e->gen > 65535) e->gen = 65535; //cap generation number to 65535 (required by PDFReference)
+      outStr->printf("%010i %05i %c\r\n", e->offset, e->gen, (e->type==xrefEntryFree)?'f':'n');
     }
   } else {
     //write the new xref
@@ -1244,16 +1245,16 @@ void XRef::writeToFile(OutStream* outStr, GBool writeAllEntries) {
     while (i < size) {
       int j;
       for(j=i; j<size; j++) { //look for consecutive entries
-        if ((entries[j].type == xrefEntryFree) && (entries[j].gen == 0))
+        if ((getEntry(j)->type == xrefEntryFree) && (getEntry(j)->gen == 0))
           break;
       }
       if (j-i != 0)
       {
         outStr->printf("%i %i\r\n", i, j-i);
         for (int k=i; k<j; k++) {
-          XRefEntry &e = entries[k];
-          if(e.gen > 65535) e.gen = 65535; //cap generation number to 65535 (required by PDFReference)
-          outStr->printf("%010i %05i %c\r\n", e.offset, e.gen, (e.type==xrefEntryFree)?'f':'n');
+          XRefEntry *e = getEntry(k);
+          if(e->gen > 65535) e->gen = 65535; //cap generation number to 65535 (required by PDFReference)
+          outStr->printf("%010i %05i %c\r\n", e->offset, e->gen, (e->type==xrefEntryFree)?'f':'n');
         }
         i = j;
       }
