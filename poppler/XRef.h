@@ -46,7 +46,8 @@ class PopplerCache;
 enum XRefEntryType {
   xrefEntryFree,
   xrefEntryUncompressed,
-  xrefEntryCompressed
+  xrefEntryCompressed,
+  xrefEntryNone
 };
 
 struct XRefEntry {
@@ -122,7 +123,7 @@ public:
 
   // Direct access.
   int getSize() { return size; }
-  XRefEntry *getEntry(int i) { return &entries[i]; }
+  XRefEntry *getEntry(int i);
   Object *getTrailerDict() { return &trailerDict; }
 
   // Write access
@@ -156,6 +157,7 @@ private:
   int permFlags;		// permission bits
   Guchar fileKey[16];		// file decryption key
   GBool ownerPasswordOk;	// true if owner password is correct
+  Guint prevXRefOffset;		// position of prev XRef section (= next to read)
 
   void init();
   int reserve(int newSize);
