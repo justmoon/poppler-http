@@ -274,7 +274,6 @@ XRef::XRef() {
 }
 
 XRef::XRef(BaseStream *strA) {
-  Guint pos;
   Object obj;
 
   init();
@@ -286,11 +285,11 @@ XRef::XRef(BaseStream *strA) {
   // read the trailer
   str = strA;
   start = str->getStart();
-  pos = getStartXref();
+  prevXRefOffset = pos;
 
   // if there was a problem with the 'startxref' position, try to
   // reconstruct the xref table
-  if (pos == 0) {
+  if (prevXRefOffset == 0) {
     if (!(ok = constructXRef())) {
       errCode = errDamaged;
       return;
@@ -299,7 +298,7 @@ XRef::XRef(BaseStream *strA) {
   // read the xref table
   } else {
     GooVector<Guint> followedXRefStm;
-    while (readXRef(&pos, &followedXRefStm)) ;
+    readXRef(&prevXRefOffset, &followedXRefStm);
 
     // if there was a problem with the xref table,
     // try to reconstruct it
@@ -308,6 +307,18 @@ XRef::XRef(BaseStream *strA) {
 	errCode = errDamaged;
 	return;
       }
+    }
+  }
+
+  // set size according to trailer dict
+  trailerDict.dictLookupNF("Size", &obj);
+  if (obj.isInt() && (resize(obj.getInt()) == obj.getInt())) {
+    obj.free();
+  } else {
+    obj.free();
+    if (!(ok = constructXRef())) {
+      errCode = errDamaged;
+      return;
     }
   }
 
@@ -379,7 +390,7 @@ int XRef::resize(int newSize)
 
     for (int i = size; i < newSize; ++i) {
       entries[i].offset = 0xffffffff;
-      entries[i].type = xrefEntryFree;
+      entries[i].type = xrefEntryNone;
       entries[i].obj.initNull ();
       entries[i].updated = false;
       entries[i].gen = 0;
@@ -1256,4 +1267,43 @@ void XRef::writeToFile(OutStream* outStr, GBool writeAllEntries) {
     }
   }
 }
+
+XRefEntry *XRef::getEntry(int i)
+{
+  if (entries[i].type == xrefEntryNone) {
+
+      GooVector<Guint> followedPrev;
+      while (prevXRefOffset && entries[i].type == xrefEntryNone) {
+        bool ok = true;
+        for (size_t j = 0; j < followedPrev.size(); j++) {
+          if (followedPrev.at(j) == prevXRefOffset) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) {
+          error(-1, "Circular XRef");
+          if (!(ok = constructXRef())) {
+            errCode = errDamaged;
+          }
+          break;
+        }
+
+        followedPrev.push_back (prevXRefOffset);
+
+        GooVector<Guint> followedXRefStm;
+        if (!readXRef(&prevXRefOffset, &followedXRefStm)) {
+            prevXRefOffset = 0;
+        }
+      }
+
+      if (entries[i].type == xrefEntryNone) {
+         error(-1, "Invalid XRef entry");
+         entries[i].type = xrefEntryFree;
+      }
+  }
+
+  return &entries[i];
+}
+
 
