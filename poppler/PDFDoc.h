@@ -127,6 +127,9 @@ public:
   // Return the structure tree root object.
   Object *getStructTreeRoot() { return catalog->getStructTreeRoot(); }
 
+  // Get page.
+  Page *getPage(int page);
+
   // Display a page.
   void displayPage(OutputDev *out, int page,
 		   double hDPI, double vDPI, int rotate,
