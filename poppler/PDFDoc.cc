@@ -397,8 +397,11 @@ void PDFDoc::displayPage(OutputDev *out, int page,
   if (globalParams->getPrintCommands()) {
     printf("***** page %d *****\n", page);
   }
-  catalog->getPage(page)->display(out, hDPI, vDPI,
-				  rotate, useMediaBox, crop, printing, catalog,
+
+  Page *p = getPage(page);
+  if (!p) return;
+
+  p->display(out, hDPI, vDPI, rotate, useMediaBox, crop, printing, catalog,
 				  abortCheckCbk, abortCheckCbkData,
 				  annotDisplayDecideCbk, annotDisplayDecideCbkData);
 }
@@ -427,8 +430,11 @@ void PDFDoc::displayPageSlice(OutputDev *out, int page,
 			      void *abortCheckCbkData,
                               GBool (*annotDisplayDecideCbk)(Annot *annot, void *user_data),
                               void *annotDisplayDecideCbkData) {
-  catalog->getPage(page)->displaySlice(out, hDPI, vDPI,
-				       rotate, useMediaBox, crop,
+
+  Page *p = getPage(page);
+  if (!p) return;
+
+  p->displaySlice(out, hDPI, vDPI, rotate, useMediaBox, crop,
 				       sliceX, sliceY, sliceW, sliceH,
 				       printing, catalog,
 				       abortCheckCbk, abortCheckCbkData,
@@ -436,11 +442,19 @@ void PDFDoc::displayPageSlice(OutputDev *out, int page,
 }
 
 Links *PDFDoc::getLinks(int page) {
-  return catalog->getPage(page)->getLinks(catalog);
+  Page *p = getPage(page);
+  if (!p) {
+    Object obj;
+    obj.initNull();
+    return new Links (&obj, NULL);
+  }
+  return p->getLinks(catalog);
 }
-  
+
 void PDFDoc::processLinks(OutputDev *out, int page) {
-  catalog->getPage(page)->processLinks(out, catalog);
+  Page *p = getPage(page);
+  if (!p) return;
+  p->processLinks(out, catalog);
 }
 
 Linearization *PDFDoc::getLinearization()
