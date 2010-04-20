@@ -238,6 +238,9 @@ private:
   void saveIncrementalUpdate (OutStream* outStr);
   void saveCompleteRewrite (OutStream* outStr);
 
+  Guint getPageOffset(int page);
+  Page *parsePage(Guint offset, int page);
+
   // Get hints.
   Hints *getHints();
 
@@ -268,6 +271,7 @@ private:
 #ifndef DISABLE_OUTLINE
   Outline *outline;
 #endif
+  Page **pageCache;
 
   GBool ok;
   int errCode;
