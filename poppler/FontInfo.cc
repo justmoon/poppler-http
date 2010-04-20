@@ -70,7 +70,9 @@ GooList *FontInfoScanner::scan(int nPages) {
   }
 
   for (int pg = currentPage; pg < lastPage; ++pg) {
-    page = doc->getCatalog()->getPage(pg);
+    page = doc->getPage(pg);
+    if (!page) continue;
+
     if ((resDict = page->getResourceDict())) {
       scanFonts(resDict, result);
     }
