@@ -102,6 +102,7 @@ void PDFDoc::init()
 #endif
   startXRefPos = ~(Guint)0;
   secHdlr = NULL;
+  pageCache = NULL;
 }
 
 PDFDoc::PDFDoc()
@@ -261,6 +262,14 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
 }
 
 PDFDoc::~PDFDoc() {
+  if (pageCache) {
+    for (int i = 0; i < getNumPages(); i++) {
+      if (pageCache[i]) {
+        delete pageCache[i];
+      }
+    }
+    gfree(pageCache);
+  }
   delete secHdlr;
 #ifndef DISABLE_OUTLINE
   if (outline) {
@@ -1055,11 +1064,76 @@ int PDFDoc::getNumPages()
   }
 }
 
+Guint PDFDoc::getPageOffset(int page)
+{
+  if (isLinearized() && (page-1 == getLinearization()->getPageFirst())) {
+    return xref->getEntry(linearization->getObjectNumberFirst())->offset;
+  }
+
+  Guint offset;
+  if (getHints() && (offset = getHints()->getPageOffset(page))) {
+    return offset;
+  } else {
+    error(-1, "Failed getting page offset from hint table");
+    return 0;
+  }
+}
+
+Page *PDFDoc::parsePage(Guint offset, int page)
+{
+  Page *p = NULL;
+  Object obj;
+
+  obj.initNull();
+  Stream *stream = str->makeSubStream(offset, gFalse, 0, &obj);
+  Parser parser = Parser(xref, new Lexer(xref, stream), gTrue);
+
+  Object obj1, obj2, obj3, obj4;
+  if (parser.getObj(&obj1)->isInt() &&
+      parser.getObj(&obj2)->isInt() &&
+      parser.getObj(&obj3)->isCmd("obj") &&
+      parser.getObj(&obj4)->isDict("Page")) {
+    Ref pageRef;
+    Dict *pageDict;
+    pageRef.num = obj1.getInt();
+    pageRef.gen = obj2.getInt();
+    pageDict = obj4.getDict();
+    p = new Page(xref, page, pageDict, pageRef,
+                 new PageAttrs(NULL, pageDict),
+                 catalog->getForm());
+    if (!p->isOk()) {
+      delete p;
+      p = NULL;
+    }
+  }
+  obj4.free();
+  obj3.free();
+  obj2.free();
+  obj1.free();
+
+  return p;
+}
+
 Page *PDFDoc::getPage(int page)
 {
   if ((page < 1) || page > getNumPages()) return NULL;
 
-  {
+  if (isLinearized()) {
+    if (!pageCache) {
+      pageCache = (Page **) gmallocn(getNumPages(), sizeof(Page *));
+      for (int i = 0; i < getNumPages(); i++) {
+        pageCache[i] = NULL;
+      }
+    }
+    if (!pageCache[page-1]) {
+      pageCache[page-1] = parsePage(getPageOffset(page), page);
+      if (!pageCache[page-1]) {
+         error(-1, "Failed parsing page %d at offset %d",
+               page, getPageOffset(page));
+      }
+    }
+    return pageCache[page-1];
+  } else {
     return catalog->getPage(page);
   }
 }
