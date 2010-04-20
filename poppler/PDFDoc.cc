@@ -1024,3 +1024,11 @@ Guint PDFDoc::getMainXRefEntriesOffset()
   return mainXRefEntriesOffset;
 }
 
+Page *PDFDoc::getPage(int page)
+{
+  if ((page < 1) || page > getNumPages()) return NULL;
+
+  {
+    return catalog->getPage(page);
+  }
+}
