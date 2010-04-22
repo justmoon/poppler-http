@@ -190,8 +190,9 @@ Page::Page(DocumentData *doc, int index) {
   m_page = new PageData();
   m_page->index = index;
   m_page->parentDoc = doc;
-  m_page->page = doc->doc->getCatalog()->getPage(m_page->index + 1);
+  m_page->page = doc->doc->getPage(m_page->index + 1);
   m_page->transition = 0;
+  ok = m_page->page ? true : false;
 }
 
 Page::~Page()

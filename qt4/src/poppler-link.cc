@@ -232,9 +232,11 @@ class LinkMoviePrivate : public LinkPrivate
 		
 		int leftAux = 0, topAux = 0, rightAux = 0, bottomAux = 0;
 		
-		if (d->pageNum > 0 && d->pageNum <= data.doc->doc->getNumPages())
+		::Page *page;
+		if (d->pageNum > 0 &&
+		    d->pageNum <= data.doc->doc->getNumPages() &&
+		    (page = data.doc->doc->getPage( d->pageNum )))
 		{
-			::Page *page = data.doc->doc->getCatalog()->getPage( d->pageNum );
 			cvtUserToDev( page, left, top, &leftAux, &topAux );
 			cvtUserToDev( page, right, bottom, &rightAux, &bottomAux );
 			

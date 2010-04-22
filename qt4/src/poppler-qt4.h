@@ -609,11 +609,14 @@ delete it;
 	**/
 	QString label() const;
 	
+	bool isOk() { return ok; };
+
     private:
 	Q_DISABLE_COPY(Page)
 
 	Page(DocumentData *doc, int index);
 	PageData *m_page;
+        bool ok;
     };
 
 /**
