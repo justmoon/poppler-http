@@ -98,7 +98,13 @@ namespace Poppler {
 
     Page *Document::page(int index) const
     {
-	return new Page(m_doc, index);
+	Page *page = new Page(m_doc, index);
+	if (!page->isOk()) {
+	  delete page;
+	  return NULL;
+	}
+
+	return page;
     }
 
     bool Document::isLocked() const
