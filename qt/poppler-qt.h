@@ -31,6 +31,7 @@
 #include <qdom.h>
 #include <qpixmap.h>
 
+
 namespace Poppler {
 
 class Document;
@@ -198,9 +199,12 @@ class Page {
     */
     QValueList<Link*> links() const;
 
+    bool isOk() { return ok; };
+
   private:
     Page(const Document *doc, int index);
     PageData *data;
+    bool ok;
 };
 
 class DocumentData;
@@ -219,7 +223,7 @@ public:
   
   static Document *load(const QString & filePath);
   
-  Page *getPage(int index) const{ return new Page(this, index); }
+  Page *getPage(int index) const;
   
   int getNumPages() const;
   
