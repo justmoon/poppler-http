@@ -50,6 +50,7 @@ struct PSFont8Info;
 struct PSFont16Enc;
 class PSOutCustomColor;
 class Function;
+class PDFDoc;
 
 //------------------------------------------------------------------------
 // PSOutputDev
@@ -75,7 +76,7 @@ class PSOutputDev: public OutputDev {
 public:
 
   // Open a PostScript output file, and write the prolog.
-  PSOutputDev(const char *fileName, XRef *xrefA, Catalog *catalog,
+  PSOutputDev(const char *fileName, PDFDoc *doc, XRef *xrefA, Catalog *catalog,
 	      char *psTitle,
 	      int firstPage, int lastPage, PSOutMode modeA,
 	      int paperWidthA = -1, int paperHeightA = -1,
@@ -88,6 +89,7 @@ public:
   // Open a PSOutputDev that will write to a generic stream.
   PSOutputDev(PSOutputFunc outputFuncA, void *outputStreamA,
 	      char *psTitle,
+	      PDFDoc *doc,
 	      XRef *xrefA, Catalog *catalog,
 	      int firstPage, int lastPage, PSOutMode modeA,
 	      int paperWidthA = -1, int paperHeightA = -1,
@@ -144,9 +146,6 @@ public:
 
   // Write the Xpdf procset.
   void writeXpdfProcset();
-
-  // Write the document-level setup.
-  void writeDocSetup(Catalog *catalog, int firstPage, int lastPage, GBool duplexA);
 
   // Write the trailer for the current page.
   void writePageTrailer();
@@ -287,7 +286,7 @@ public:
 private:
 
   void init(PSOutputFunc outputFuncA, void *outputStreamA,
-	    PSFileType fileTypeA, char *pstitle, XRef *xrefA, Catalog *catalog,
+	    PSFileType fileTypeA, char *pstitle, PDFDoc *doc, XRef *xrefA, Catalog *catalog,
 	    int firstPage, int lastPage, PSOutMode modeA,
 	    int imgLLXA, int imgLLYA, int imgURXA, int imgURYA,
 	    GBool manualCtrlA, int paperWidthA, int paperHeightA,
@@ -341,6 +340,10 @@ private:
 		    double *x1, double *y1);
 #endif
   void cvtFunction(Function *func);
+
+  // Write the document-level setup.
+  void writeDocSetup(PDFDoc *doc, Catalog *catalog, int firstPage, int lastPage, GBool duplexA);
+
   void writePSChar(char c);
   void writePS(char *s);
   void writePSFmt(const char *fmt, ...);
