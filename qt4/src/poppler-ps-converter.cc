@@ -195,6 +195,7 @@ bool PSConverter::convert()
 	
 	PSOutputDev *psOut = new PSOutputDev(outputToQIODevice, dev,
 	                                     pstitlechar,
+	                                     d->document->doc,
 	                                     d->document->doc->getXRef(),
 	                                     d->document->doc->getCatalog(),
 	                                     1,

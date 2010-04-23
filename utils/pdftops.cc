@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
   }
 
   // write PostScript file
-  psOut = new PSOutputDev(psFileName->getCString(), doc->getXRef(),
+  psOut = new PSOutputDev(psFileName->getCString(), doc, doc->getXRef(),
 			  doc->getCatalog(), NULL, firstPage, lastPage, mode,
 			  paperWidth,
 			  paperHeight,
