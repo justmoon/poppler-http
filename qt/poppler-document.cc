@@ -113,6 +113,17 @@ int Document::getNumPages() const
   return data->doc.getNumPages();
 }
 
+Page *Document::getPage(int index) const
+{
+  Page *p = new Page(this, index);
+  if (!p->isOk()) {
+    delete p;
+    return NULL;
+  }
+
+  return p;
+}
+
 QValueList<FontInfo> Document::fonts() const
 {
   QValueList<FontInfo> ourList;

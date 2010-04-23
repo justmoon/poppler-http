@@ -47,6 +47,7 @@ class PageData {
   const Document *doc;
   int index;
   PageTransition *transition;
+  ::Page *page;
 };
 
 Page::Page(const Document *doc, int index) {
@@ -54,6 +55,8 @@ Page::Page(const Document *doc, int index) {
   data->index = index;
   data->doc = doc;
   data->transition = 0;
+  data->page = doc->data->doc.getPage(data->index + 1);
+  ok = data->page ? true : false;
 }
 
 Page::~Page()
@@ -132,7 +135,7 @@ QString Page::getText(const Rectangle &r) const
   output_dev = new TextOutputDev(0, gFalse, gFalse, gFalse);
   data->doc->data->doc.displayPageSlice(output_dev, data->index + 1, 72, 72,
       0, false, false, false, -1, -1, -1, -1);
-  p = data->doc->data->doc.getCatalog()->getPage(data->index + 1);
+  p = data->page;
   if (r.isNull())
   {
     rect = p->getCropBox();
@@ -197,7 +200,7 @@ PageTransition *Page::getTransition() const
   {
     Object o;
     PageTransitionParams params;
-    params.dictObj = data->doc->data->doc.getCatalog()->getPage(data->index + 1)->getTrans(&o);
+    params.dictObj = data->page->getTrans(&o);
     data->transition = new PageTransition(params);
     o.free();
   }
@@ -208,7 +211,7 @@ QSize Page::pageSize() const
 {
   ::Page *p;
 
-  p = data->doc->data->doc.getCatalog()->getPage(data->index + 1);
+  p = data->page;
   if ( ( Page::Landscape == orientation() ) || (Page::Seascape == orientation() ) ) {
     return QSize( (int)p->getCropHeight(), (int)p->getCropWidth() );
   } else {
@@ -218,7 +221,7 @@ QSize Page::pageSize() const
 
 Page::Orientation Page::orientation() const
 {
-  ::Page *p = data->doc->data->doc.getCatalog()->getPage(data->index + 1);
+  ::Page *p = data->page;
 
   int rotation = p->getRotate();
   switch (rotation) {
