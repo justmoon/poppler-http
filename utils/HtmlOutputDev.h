@@ -256,6 +256,7 @@ public:
                                GBool (* abortCheckCbk)(void *data) = NULL,
                                void * abortCheckCbkData = NULL)
   {
+   docPage = page;
    catalog = catalogA;
    return gTrue;
   }
@@ -323,6 +324,7 @@ private:
   GooString *docTitle;
   GooList *glMetaVars;
   Catalog *catalog;
+  Page *docPage;
   friend class HtmlPage;
 };
 
