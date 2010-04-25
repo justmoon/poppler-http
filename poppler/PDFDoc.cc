@@ -232,7 +232,7 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
   checkHeader();
 
   // read xref table
-  xref = new XRef(str, getStartXRef());
+  xref = new XRef(str, getStartXRef(), getMainXRefEntriesOffset());
   if (!xref->isOk()) {
     error(-1, "Couldn't read xref table");
     errCode = xref->getErrorCode();
@@ -1013,4 +1013,14 @@ Guint PDFDoc::getStartXRef()
   return startXRefPos;
 }
 
+Guint PDFDoc::getMainXRefEntriesOffset()
+{
+  Guint mainXRefEntriesOffset = 0;
+
+  if (isLinearized()) {
+    mainXRefEntriesOffset = getLinearization()->getMainXRefEntriesOffset();
+  }
+
+  return mainXRefEntriesOffset;
+}
 

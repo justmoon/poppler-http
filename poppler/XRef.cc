@@ -262,16 +262,19 @@ void XRef::init() {
   streamEnds = NULL;
   streamEndsLen = 0;
   objStrs = new PopplerCache(5);
+  mainXRefEntriesOffset = 0;
+  xRefStream = gFalse;
 }
 
 XRef::XRef() {
   init();
 }
 
-XRef::XRef(BaseStream *strA, Guint pos) {
+XRef::XRef(BaseStream *strA, Guint pos, Guint mainXRefEntriesOffsetA) {
   Object obj;
 
   init();
+  mainXRefEntriesOffset = mainXRefEntriesOffsetA;
 
   encrypted = gFalse;
   permFlags = defPermFlags;
@@ -434,6 +437,9 @@ GBool XRef::readXRef(Guint *pos, GooVector<Guint> *followedXRefStm) {
     obj.free();
     if (!parser->getObj(&obj)->isStream()) {
       goto err1;
+    }
+    if (trailerDict.isNone()) {
+      xRefStream = gTrue;
     }
     more = readXRefStream(obj.getStream(), pos);
     obj.free();
@@ -1220,10 +1226,44 @@ void XRef::writeToFile(OutStream* outStr, GBool writeAllEntries) {
   }
 }
 
+GBool XRef::parseEntry(Guint offset, XRefEntry *entry)
+{
+  GBool r;
+
+  Object obj;
+  obj.initNull();
+  Parser parser = Parser(NULL, new Lexer(NULL,
+     str->makeSubStream(offset, gFalse, 20, &obj)), gTrue);
+
+  Object obj1, obj2, obj3;
+  if ((parser.getObj(&obj1)->isInt()) &&
+      (parser.getObj(&obj2)->isInt()) &&
+      (parser.getObj(&obj3)->isCmd("n") || obj3.isCmd("f"))) {
+    entry->offset = (Guint) obj1.getInt();
+    entry->gen = obj2.getInt();
+    entry->type = obj3.isCmd("n") ? xrefEntryUncompressed : xrefEntryFree;
+    entry->obj.initNull ();
+    entry->updated = false;
+    r = gTrue;
+  } else {
+    r = gFalse;
+  }
+  obj1.free();
+  obj2.free();
+  obj3.free();
+
+  return r;
+}
+
 XRefEntry *XRef::getEntry(int i)
 {
   if (entries[i].type == xrefEntryNone) {
 
+    if ((!xRefStream) && mainXRefEntriesOffset) {
+      if (!parseEntry(mainXRefEntriesOffset + 20*i, &entries[i])) {
+        error(-1, "Failed to parse XRef entry [%d].", i);
+      }
+    } else {
       GooVector<Guint> followedPrev;
       while (prevXRefOffset && entries[i].type == xrefEntryNone) {
         bool ok = true;
@@ -1253,6 +1293,7 @@ XRefEntry *XRef::getEntry(int i)
          error(-1, "Invalid XRef entry");
          entries[i].type = xrefEntryFree;
       }
+    }
   }
 
   return &entries[i];

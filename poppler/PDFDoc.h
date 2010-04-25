@@ -241,6 +241,9 @@ private:
   GBool checkEncryption(GooString *ownerPassword, GooString *userPassword);
   // Get the offset of the start xref table.
   Guint getStartXRef();
+  // Get the offset of the entries in the main XRef table of a
+  // linearized document (0 for non linearized documents).
+  Guint getMainXRefEntriesOffset();
   Guint strToUnsigned(char *s);
 
   GooString *fileName;
