@@ -65,7 +65,7 @@ public:
   // Constructor, create an empty XRef, used for PDF writing
   XRef();
   // Constructor.  Read xref table from stream.
-  XRef(BaseStream *strA, Guint pos, GBool *wasReconstructed = NULL, GBool reconstruct = false);
+  XRef(BaseStream *strA, Guint pos, Guint mainXRefEntriesOffsetA = 0, GBool *wasReconstructed = NULL, GBool reconstruct = false);
 
   // Destructor.
   ~XRef();
@@ -155,6 +155,8 @@ private:
   Guchar fileKey[16];		// file decryption key
   GBool ownerPasswordOk;	// true if owner password is correct
   Guint prevXRefOffset;		// position of prev XRef section (= next to read)
+  Guint mainXRefEntriesOffset;	// offset of entries in main XRef table
+  GBool xRefStream;		// true if last XRef section is a stream
 
   void init();
   int reserve(int newSize);
@@ -166,6 +168,8 @@ private:
   GBool readXRefStream(Stream *xrefStr, Guint *pos);
   GBool constructXRef(GBool *wasReconstructed);
   Guint strToUnsigned(char *s);
+  GBool parseEntry(Guint offset, XRefEntry *entry);
+
 };
 
 #endif

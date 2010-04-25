@@ -235,7 +235,7 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
   GBool wasReconstructed = false;
 
   // read xref table
-  xref = new XRef(str, getStartXRef(), &wasReconstructed);
+  xref = new XRef(str, getStartXRef(), getMainXRefEntriesOffset(), &wasReconstructed);
   if (!xref->isOk()) {
     error(-1, "Couldn't read xref table");
     errCode = xref->getErrorCode();
@@ -256,7 +256,7 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
       // try one more time to contruct the Catalog, maybe the problem is damaged XRef 
       delete catalog;
       delete xref;
-      xref = new XRef(str, 0, NULL, true);
+      xref = new XRef(str, 0, 0, NULL, true);
       catalog = new Catalog(xref);
     }
 
@@ -1027,4 +1027,14 @@ Guint PDFDoc::getStartXRef()
   return startXRefPos;
 }
 
+Guint PDFDoc::getMainXRefEntriesOffset()
+{
+  Guint mainXRefEntriesOffset = 0;
+
+  if (isLinearized()) {
+    mainXRefEntriesOffset = getLinearization()->getMainXRefEntriesOffset();
+  }
+
+  return mainXRefEntriesOffset;
+}
 
