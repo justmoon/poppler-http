@@ -1196,10 +1196,8 @@ Ref XRef::addIndirectObject (Object* o) {
   XRefEntry *e;
   if (entryIndexToUse == -1) {
     entryIndexToUse = size;
-    size++;
-    entries = (XRefEntry *)greallocn(entries, size, sizeof(XRefEntry));
+    add(entryIndexToUse, 0, 0, gFalse);
     e = &entries[entryIndexToUse];
-    e->gen = 0;
   } else {
     //reuse a free entry
     e = &entries[entryIndexToUse];
