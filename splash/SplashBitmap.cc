@@ -335,17 +335,13 @@ SplashError SplashBitmap::writeImgFile(ImgWriter *writer, FILE *f, int hDPI, int
     return splashErrGeneric;
   }
   
-  if (withAlpha) {
+  if (!withAlpha) {
     e = writeImgDataRGB(writer);
   } else {
     e = writeImgDataRGBA(writer);
   }
   
   if (e) return e;
-  
-  if (writer->close()) {
-    return splashErrGeneric;
-  }
 
   return splashOk;
 }
@@ -365,6 +361,9 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
       }
       if (!writer->writePointers(row_pointers, height)) {
         delete[] row_pointers;
+        return splashErrGeneric;
+      }
+      if (!writer->close()) {
         return splashErrGeneric;
       }
       delete[] row_pointers;
@@ -387,6 +386,9 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
           return splashErrGeneric;
         }
       }
+      if (!writer->close()) {
+        return splashErrGeneric;
+      }
       delete[] row;
     }
     break;
@@ -407,6 +409,9 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
           return splashErrGeneric;
         }
       }
+      if (!writer->close()) {
+        return splashErrGeneric;
+      }
       delete[] row;
     }
     break;
@@ -426,6 +431,9 @@ SplashError SplashBitmap::writeImgDataRGB(ImgWriter *writer)
           delete[] row;
           return splashErrGeneric;
         }
+      }
+      if (!writer->close()) {
+        return splashErrGeneric;
       }
       delete[] row;
     }
@@ -523,5 +531,8 @@ SplashError SplashBitmap::writeImgDataRGBA(ImgWriter *writer)
     break;
   }
   
+  if (!writer->close()) {
+    return splashErrGeneric;
+  }
   delete[] row;
 }
