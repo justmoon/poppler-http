@@ -65,12 +65,15 @@ public:
   
   SplashError writeImgFile(SplashImageFileFormat format, char *fileName, int hDPI, int vDPI);
   SplashError writeImgFile(SplashImageFileFormat format, FILE *f, int hDPI, int vDPI);
-  SplashError writeImgFile(ImgWriter *writer, FILE *f, int hDPI, int vDPI);
+  SplashError writeImgFile(ImgWriter *writer, FILE *f, int hDPI, int vDPI, GBool withAlpha = gFalse);
 
   void getPixel(int x, int y, SplashColorPtr pixel);
   Guchar getAlpha(int x, int y);
 
 private:
+
+  SplashError writeImgDataRGB(ImgWriter *writer);
+  SplashError writeImgDataRGBA(ImgWriter *writer);
 
   int width, height;		// size of bitmap
   int rowSize;			// size of one row of data, in bytes
