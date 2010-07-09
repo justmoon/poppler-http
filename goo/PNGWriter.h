@@ -22,11 +22,12 @@
 #include <cstdio>
 #include <png.h>
 #include "ImgWriter.h"
+#include "goo/gtypes.h"
 
 class PNGWriter : public ImgWriter
 {
 	public:
-		PNGWriter();
+		PNGWriter(GBool withAlphaChannel = gFalse);
 		~PNGWriter();
 		
 		bool init(FILE *f, int width, int height, int hDPI, int vDPI);
@@ -39,6 +40,7 @@ class PNGWriter : public ImgWriter
 	private:
 		png_structp png_ptr;
 		png_infop info_ptr;
+		GBool withAlphaChannel;
 };
 
 #endif
