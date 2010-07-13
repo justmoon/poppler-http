@@ -39,6 +39,7 @@
 #include "GlobalParams.h"
 #include "Object.h"
 #include "PDFDoc.h"
+#include "PDFDocFactory.h"
 #include "CairoOutputDev.h"
 
 #define OUT_FILE_SZ 512
@@ -133,6 +134,8 @@ static const ArgDesc argDesc[] = {
 static void format_output_filename(char *outFile, char *outRoot,
            int pg_num_len, int pg)
 {
+  if (!outRoot) outRoot = "cairoout";
+  
   snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
     OUT_FILE_SZ - 32, outRoot, pg_num_len, pg);
   
@@ -303,7 +306,17 @@ int main(int argc, char *argv[]) {
   } else {
     userPW = NULL;
   }
-  doc = new PDFDoc(fileName, ownerPW, userPW);
+
+  if (fileName == NULL) {
+    fileName = new GooString("fd://0");
+  }
+  if (fileName->cmp("-") == 0) {
+    delete fileName;
+    fileName = new GooString("fd://0");
+  }
+  doc = PDFDocFactory().createPDFDoc(*fileName, ownerPW, userPW);
+  delete fileName;
+  
   if (userPW) {
     delete userPW;
   }
