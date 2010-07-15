@@ -1,0 +1,125 @@
+.\" Copyright 2010 Stefan Thomas
+.TH pdftocairo 1 "17 July 2010"
+.SH NAME
+pdftocairo \- Portable Document Format (PDF) converter using Cairo
+converter (version 1.00)
+.SH SYNOPSIS
+.B pdftocairo
+[options]
+.I PDF-file Out-root
+.SH DESCRIPTION
+.B Pdftocairo
+converts Portable Document Format (PDF) files to vector based (PDF, PS, SVG) and
+non-vector based (PNG, JPEG) formats.
+.PP
+Pdftocairo reads the PDF file,
+.IR PDF-file ,
+and writes one output file for each page,
+.IR Out-root - nnnnnn .[format],
+where
+.I nnnnnn
+is the page number.
+.SH OPTIONS
+.TP
+.BI \-f " number"
+Specifies the first page to convert.
+.TP
+.BI \-l " number"
+Specifies the last page to convert.
+.TP
+.BI \-r " number"
+Specifies the X and Y resolution, in DPI.  The default is 150 DPI.
+.TP
+.BI \-rx " number"
+Specifies the X resolution, in DPI.  The default is 150 DPI.
+.TP
+.BI \-ry " number"
+Specifies the Y resolution, in DPI.  The default is 150 DPI.
+.TP
+.BI \-scale-to " number"
+Scales each page to fit in scale-to*scale-to pixel box.
+.TP
+.BI \-scale-to-x " number"
+Scales each page horizontally to fit in scale-to-x pixels.
+.TP
+.BI \-scale-to-y " number"
+Scales each page vertically to fit in scale-to-y pixels.
+.TP
+.BI \-x " number"
+Specifies the x-coordinate of the crop area top left corner
+.TP
+.BI \-y " number"
+Specifies the y-coordinate of the crop area top left corner
+.TP
+.BI \-W " number"
+Specifies the width of crop area in pixels (default is 0)
+.TP
+.BI \-H " number"
+Specifies the height of crop area in pixels (default is 0)
+.TP
+.BI \-sz " number"
+Specifies the size of crop square in pixels (sets W and H)
+.TP
+.B \-cropbox
+Uses the crop box rather than media box when generating the files
+.TP
+.B \-png
+Generates a PNG file
+.TP
+.B \-jpeg
+Generates a JPEG file
+.TP
+.B \-ps
+Generates a PS file
+.TP
+.B \-pdf
+Generates a PDF file
+.TP
+.B \-svg
+Generates a SVG file
+.TP
+.BI \-opw " password"
+Specify the owner password for the PDF file.  Providing this will
+bypass all security restrictions.
+.TP
+.BI \-upw " password"
+Specify the user password for the PDF file.
+.TP
+.B \-q
+Don't print any messages or errors.
+.TP
+.B \-v
+Print copyright and version information.
+.TP
+.B \-h
+Print usage information.
+.RB ( \-help
+and
+.B \-\-help
+are equivalent.)
+.SH EXIT CODES
+The poppler tools use the following exit codes:
+.TP
+0
+No error.
+.TP
+1
+Error opening a PDF file.
+.TP
+2
+Error opening an output file.
+.TP
+3
+Error related to PDF permissions.
+.TP
+99
+Other error.
+.SH AUTHOR
+The pdftocairo software and documentation are copyright 2009 Adrian Johnson and 2010 Stefan Thomas
+.SH "SEE ALSO"
+.BR pdftoppm (1),
+.BR pdftops (1),
+.BR pdftotext (1),
+.BR pdfinfo (1),
+.BR pdffonts (1),
+.BR pdfimages (1),
