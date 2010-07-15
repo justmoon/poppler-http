@@ -36,6 +36,7 @@
 #include "parseargs.h"
 #include "goo/gmem.h"
 #include "goo/GooString.h"
+#include "goo/JpegWriter.h"
 #include "GlobalParams.h"
 #include "Object.h"
 #include "PDFDoc.h"
@@ -59,6 +60,7 @@ static int h = 0;
 static int sz = 0;
 static GBool useCropBox = gFalse;
 static GBool png = gFalse;
+static GBool jpg = gFalse;
 static GBool ps = gFalse;
 static GBool pdf = gFalse;
 static GBool svg = gFalse;
@@ -102,11 +104,13 @@ static const ArgDesc argDesc[] = {
 
   {"-png",    argFlag,     &png,           0,
    "generate a PNG file"},
-  {"-ps",   argFlag,     &ps,          0,
+  {"-jpeg",   argFlag,     &jpg,           0,
+   "generate a JPEG file"},
+  {"-ps",     argFlag,     &ps,            0,
    "generate PostScript file"},
-  {"-pdf",   argFlag,     &pdf,          0,
+  {"-pdf",    argFlag,     &pdf,           0,
    "generate a PDF file"},
-  {"-svg",   argFlag,     &svg,          0,
+  {"-svg",    argFlag,     &svg,           0,
    "generate a SVG file"},
 
 
@@ -141,6 +145,8 @@ static void format_output_filename(char *outFile, char *outRoot,
   
   if (png) {
     strcat(outFile, ".png");
+  } else if (jpg) {
+    strcat(outFile, ".jpg");
   } else if (ps) {
     strcat(outFile, ".ps");
   } else if (pdf) {
@@ -157,6 +163,8 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
   
   if (png) {
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
+  } else if (jpg) {
+    surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w*x_res/72.0, h*y_res/72.0);
   } else if (ps) {
     surface = cairo_ps_surface_create(outFile, w, h);
   } else if (pdf) {
@@ -168,10 +176,43 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
   return surface;
 }
 
+static void end_page_jpeg(cairo_surface_t *surface, char *outFile)
+{
+	unsigned char *p;
+	int width, height, stride, i, j;
+	FILE *f;
+	JpegWriter *writer;
+	unsigned char *row;
+	
+	width = cairo_image_surface_get_width(surface);
+	height = cairo_image_surface_get_height(surface);
+	stride = cairo_image_surface_get_stride(surface);
+	p = cairo_image_surface_get_data(surface);
+	
+  f = fopen(outFile, "w");
+  writer = new JpegWriter();
+  writer->init(f, width, height, 72, 72);
+
+  row = new unsigned char[3 * width];
+  for (i = 0; i < height; i++) {
+    for (j = 0; j < width; j++) {
+      row[3*j] = p[j * 4 + 2];
+      row[3*j+1] = p[j * 4 + 1];
+      row[3*j+2] = p[j * 4];
+    }
+
+    writer->writeRow(&row);
+    p += stride;
+	}
+  writer->close();
+}
+
 static void end_page(cairo_surface_t *surface, char *outFile)
 {
   if (png) {
     cairo_surface_write_to_png(surface, outFile);
+  } else if (jpg) {
+    end_page_jpeg(surface, outFile);
   } else if (ps || pdf || svg) {
     cairo_surface_show_page(surface);
   }
@@ -194,6 +235,7 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
   h = (y+h > pg_h ? (int)ceil(pg_h-y) : h);
 
   cr = cairo_create (surface);
+  
   cairo_save (cr);
   output_dev->setCairo (cr);
   output_dev->setPrinting (printing);
@@ -201,6 +243,13 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
   if (!printing)
     cairo_scale (cr, x_res/72.0, y_res/72.0);
 
+  // JPEGs are non-transparent, so we need a white background
+  if (jpg) {
+    cairo_rectangle(cr, 0, 0, w, h);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_fill(cr);
+  }
+  
   text = new TextPage(gFalse);
   if (!printing)
     output_dev->setTextPage (text);
@@ -275,8 +324,8 @@ int main(int argc, char *argv[]) {
     goto err0;
   }
 
-  if (!png && !ps && !pdf && !svg) {
-    fprintf(stderr, "One of -png, -ps, -pdf or -svg must be specified\n");
+  if (!png && !jpg && !ps && !pdf && !svg) {
+    fprintf(stderr, "One of -png, -jpeg, -ps, -pdf or -svg must be specified\n");
     goto err0;
   }
 
@@ -363,7 +412,7 @@ int main(int argc, char *argv[]) {
     }
     
     // Enable printing mode for all output types except PNG
-    printing = (png) ? gFalse : gTrue;
+    printing = (png || jpg) ? gFalse : gTrue;
     
     format_output_filename(outFile, outRoot, pg_num_len, pg);
 
