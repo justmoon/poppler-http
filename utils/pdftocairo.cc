@@ -135,7 +135,7 @@ static const ArgDesc argDesc[] = {
 };
 
 
-static void format_output_filename(char *outFile, char *outRoot,
+static void format_output_filename(char *outFile, const char *outRoot,
            int pg_num_len, int pg)
 {
   if (!outRoot) outRoot = "cairoout";
@@ -164,7 +164,7 @@ static cairo_surface_t *start_page(char *outFile, int w, int h,
   if (png) {
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
   } else if (jpg) {
-    surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w*x_res/72.0, h*y_res/72.0);
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
   } else if (ps) {
     surface = cairo_ps_surface_create(outFile, w, h);
   } else if (pdf) {
@@ -205,6 +205,9 @@ static void end_page_jpeg(cairo_surface_t *surface, char *outFile)
     p += stride;
 	}
   writer->close();
+  
+  delete writer;
+  delete[] row;
 }
 
 static void end_page(cairo_surface_t *surface, char *outFile)
@@ -227,7 +230,6 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
 {
   cairo_t *cr;
   cairo_status_t status;
-  TextPage *text = NULL;
 
   if (w == 0) w = (int)ceil(pg_w);
   if (h == 0) h = (int)ceil(pg_h);
@@ -243,17 +245,6 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
   if (!printing)
     cairo_scale (cr, x_res/72.0, y_res/72.0);
 
-  // JPEGs are non-transparent, so we need a white background
-  if (jpg) {
-    cairo_rectangle(cr, 0, 0, w, h);
-    cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_fill(cr);
-  }
-  
-  text = new TextPage(gFalse);
-  if (!printing)
-    output_dev->setTextPage (text);
-
   /* NOTE: instead of passing -1 we should/could use cairo_clip_extents()
    * to get a bounding box */
   cairo_save (cr);
@@ -266,8 +257,8 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
   cairo_restore(cr);
 
   output_dev->setCairo(NULL);
-  output_dev->setTextPage(NULL);
 
+  // Add a white background
   if (!printing) {
     cairo_save(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_DEST_OVER);
@@ -281,9 +272,6 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
     fprintf(stderr, "cairo error: %s\n", cairo_status_to_string (status));
   cairo_destroy (cr);
 
-  if (text != NULL)
-    text->decRefCnt();
-
   return 0;
 }
 
@@ -296,7 +284,7 @@ int main(int argc, char *argv[]) {
   GBool ok;
   int exitCode;
   int pg, pg_num_len;
-  double pg_w, pg_h, tmp;
+  double pg_w, pg_h;
   char *p;
   CairoOutputDev *output_dev;
   cairo_surface_t *surface;
@@ -420,12 +408,12 @@ int main(int argc, char *argv[]) {
     render_page(output_dev, doc, surface, printing, pg,
 		x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
     end_page(surface, outFile);
+    cairo_surface_finish(surface);
+    status = cairo_surface_status(surface);
+    if (status)
+      fprintf(stderr, "cairo error: %s\n", cairo_status_to_string(status));
+    cairo_surface_destroy(surface);
   }
-  cairo_surface_finish(surface);
-  status = cairo_surface_status(surface);
-  if (status)
-    fprintf(stderr, "cairo error: %s\n", cairo_status_to_string(status));
-  cairo_surface_destroy(surface);
   delete output_dev;
 
   exitCode = 0;
@@ -434,6 +422,7 @@ int main(int argc, char *argv[]) {
  err1:
   delete doc;
   delete globalParams;
+  if (outRoot) free(outRoot);
  err0:
 
   // check for memory leaks
