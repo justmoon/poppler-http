@@ -50,6 +50,7 @@ static int lastPage = 0;
 static double resolution = 0.0;
 static double x_resolution = 150.0;
 static double y_resolution = 150.0;
+static GBool split = gFalse;
 static int scaleTo = 0;
 static int x_scaleTo = 0;
 static int y_scaleTo = 0;
@@ -75,6 +76,8 @@ static const ArgDesc argDesc[] = {
    "first page to print"},
   {"-l",      argInt,      &lastPage,      0,
    "last page to print"},
+  {"-split",  argFlag,     &split,         0,
+   "force one file per page"},
 
   {"-r",      argFP,       &resolution,    0,
    "resolution, in DPI (default is 150)"},
@@ -156,27 +159,30 @@ static void format_output_filename(char *outFile, const char *outRoot,
   }
 }
 
-static cairo_surface_t *start_page(char *outFile, int w, int h,
+static cairo_surface_t *create_surface(char *outFile, int w, int h,
 		       double x_res, double y_res, int rotate)
 {
   cairo_surface_t *surface;
-  
-  if (png) {
-    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
-  } else if (jpg) {
-    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
-  } else if (ps) {
+
+  if (ps) {
     surface = cairo_ps_surface_create(outFile, w, h);
   } else if (pdf) {
     surface = cairo_pdf_surface_create(outFile, w, h);
   } else if (svg) {
     surface = cairo_svg_surface_create(outFile, w, h);
+    
+    // If the user requests multipage output, we need at least SVG 1.2
+    if (!split) cairo_svg_surface_restrict_to_version(surface, CAIRO_SVG_VERSION_1_2);
+  } else if (png) {
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
+  } else if (jpg) {
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w*x_res/72.0, h*y_res/72.0);
   }
   
   return surface;
 }
 
-static void end_page_jpeg(cairo_surface_t *surface, char *outFile)
+static void end_file_jpeg(cairo_surface_t *surface, const char *outFile)
 {
 	unsigned char *p;
 	int width, height, stride, i, j;
@@ -210,15 +216,21 @@ static void end_page_jpeg(cairo_surface_t *surface, char *outFile)
   delete[] row;
 }
 
-static void end_page(cairo_surface_t *surface, char *outFile)
+static void end_file(cairo_surface_t *surface, const char *outFile)
 {
+  cairo_status_t status;
+  
   if (png) {
     cairo_surface_write_to_png(surface, outFile);
   } else if (jpg) {
-    end_page_jpeg(surface, outFile);
-  } else if (ps || pdf || svg) {
-    cairo_surface_show_page(surface);
+    end_file_jpeg(surface, outFile);
   }
+  
+  cairo_surface_finish(surface);
+  status = cairo_surface_status(surface);
+  if (status)
+    fprintf(stderr, "cairo error: %s\n", cairo_status_to_string(status));
+  cairo_surface_destroy(surface);
 }
 
 static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
@@ -271,6 +283,9 @@ static int render_page(CairoOutputDev *output_dev, PDFDoc *doc,
   if (status)
     fprintf(stderr, "cairo error: %s\n", cairo_status_to_string (status));
   cairo_destroy (cr);
+  
+  // Emit and clear page on supporting surfaces (SVG, PDF, PS)
+  cairo_surface_show_page(surface);
 
   return 0;
 }
@@ -287,8 +302,7 @@ int main(int argc, char *argv[]) {
   double pg_w, pg_h;
   char *p;
   CairoOutputDev *output_dev;
-  cairo_surface_t *surface;
-  cairo_status_t status;
+  cairo_surface_t *surface = NULL;
   GBool printing;
 
   exitCode = 99;
@@ -316,6 +330,9 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "One of -png, -jpeg, -ps, -pdf or -svg must be specified\n");
     goto err0;
   }
+  
+  // JPEG and PNG don't support multiple pages
+  split = split || jpg || png;
 
   if (argc > 1) fileName = new GooString(argv[1]);
   if (argc == 3) {
@@ -373,11 +390,16 @@ int main(int argc, char *argv[]) {
 
   if (sz != 0)
     w = h = sz;
-
+  
   output_dev = new CairoOutputDev();
   output_dev->startDoc(doc->getXRef(), doc->getCatalog());
 
+  // Enable printing mode for all output types except PNG
+  printing = (png || jpg) ? gFalse : gTrue;
+  
+  // Calculate number of digits in output file name
   pg_num_len = (int)ceil(log((double)doc->getNumPages()) / log((double)10));
+  
   for (pg = firstPage; pg <= lastPage; ++pg) {
     if (useCropBox) {
       pg_w = doc->getPageCropWidth(pg);
@@ -399,21 +421,26 @@ int main(int argc, char *argv[]) {
       }
     }
     
-    // Enable printing mode for all output types except PNG
-    printing = (png || jpg) ? gFalse : gTrue;
-    
+    // Note that we always generate filenames for all pages, even if we only
+    // use the first one.
     format_output_filename(outFile, outRoot, pg_num_len, pg);
-
-    surface = start_page(outFile, pg_w, pg_h, x_resolution, y_resolution, doc->getPageRotate(pg));
+    
+    if (!surface) surface = create_surface(outFile,
+                                           pg_w, pg_h,
+                                           x_resolution, y_resolution,
+                                           doc->getPageRotate(pg));
+    
     render_page(output_dev, doc, surface, printing, pg,
-		x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
-    end_page(surface, outFile);
-    cairo_surface_finish(surface);
-    status = cairo_surface_status(surface);
-    if (status)
-      fprintf(stderr, "cairo error: %s\n", cairo_status_to_string(status));
-    cairo_surface_destroy(surface);
+		            x, y, w, h, pg_w, pg_h, x_resolution, y_resolution);
+		
+    // In multiple file mode, we're done with this surface
+    if (split) {
+      end_file(surface, outFile);
+      surface = NULL;
+    }
   }
+  
+  if (surface) end_file(surface, outFile);
   delete output_dev;
 
   exitCode = 0;
