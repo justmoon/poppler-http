@@ -283,6 +283,7 @@ public:
     { overlayCbk = cbk; overlayCbkData = data; }
   void setDisplayText(GBool display) { displayText = display; }
 
+  void setupFont(GfxFont *font, Dict *parentResDict);
 private:
 
   void init(PSOutputFunc outputFuncA, void *outputStreamA,
@@ -293,7 +294,6 @@ private:
             GBool duplexA);
   void setupResources(Dict *resDict);
   void setupFonts(Dict *resDict);
-  void setupFont(GfxFont *font, Dict *parentResDict);
   void setupEmbeddedType1Font(Ref *id, GooString *psName);
   void setupExternalType1Font(GooString *fileName, GooString *psName);
   void setupEmbeddedType1CFont(GfxFont *font, Ref *id, GooString *psName);
