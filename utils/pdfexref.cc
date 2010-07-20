@@ -254,7 +254,7 @@ int dump_font(FILE *f, PDFDoc *doc, Dict *dict, Dict *parentResDict)
   GBool forceRasterize = gFalse;
   GBool manualCrtl = gTrue;
   psOut = new PSOutputDev(&outputToFile, (void *) f, title,
-      doc->getXRef(), doc->getCatalog(), firstPage, lastPage, mode,
+      doc, doc->getXRef(), doc->getCatalog(), firstPage, lastPage, mode,
       paperWidth, paperHeight, duplex, imgLLX, imgLLY, imgURX, imgURY,
       forceRasterize, manualCrtl);
   if (!psOut->isOk()) {
