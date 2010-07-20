@@ -45,6 +45,7 @@ bin_PROGRAMS =					\
 	pdftops					\
 	pdftotext				\
 	pdftohtml				\
+	pdfexref				\
 	$(pdftoppm_binary)			\
 	$(pdftoabw_binary)
 
@@ -93,6 +94,12 @@ pdftohtml_SOURCES =				\
 	HtmlLinks.h				\
 	HtmlOutputDev.cc			\
 	HtmlOutputDev.h				\
+	$(common)
+
+pdfexref_SOURCES =				\
+	Extractor.cc				\
+	Extractor.h				\
+	pdfexref.cc				\
 	$(common)
 
 # Yay, automake!  It should be able to figure out that it has to dist
