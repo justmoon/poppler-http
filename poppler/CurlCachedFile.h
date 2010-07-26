@@ -19,6 +19,43 @@
 
 //------------------------------------------------------------------------
 
+enum CurlCachedFileResponseState{
+	curlResponseStatePreamble,
+	curlResponseStateMeta,
+	curlResponseStateData,
+	curlResponseStateEpilogue
+};
+
+//------------------------------------------------------------------------
+
+class CurlCachedFileResponseHandler {
+
+public:
+
+  CurlCachedFileResponseHandler(CachedFileWriter *writerA);
+  ~CurlCachedFileResponseHandler();
+  size_t handleHeader(const char *ptr, size_t len);
+  size_t handleBody(const char *ptr, size_t len);
+
+private:
+
+  CachedFileWriter *writer;
+  GooString *boundary;
+  CurlCachedFileResponseState state;
+  char *buffer;
+  size_t bufferPos;
+  size_t bufferLen;
+  size_t dataLen;
+  
+  static void trim(GooString *subject);
+  static GooString *getHeaderValue(const char *headerString, size_t len);
+  static char *getNextHeader(char *bufferA);
+  void enableMultipart(const char *boundaryA);
+
+};
+
+//------------------------------------------------------------------------
+
 class CurlCachedFileLoader : public CachedFileLoader {
 
 public:
