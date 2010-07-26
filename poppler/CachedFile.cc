@@ -13,6 +13,9 @@
 #include <config.h>
 #include "CachedFile.h"
 
+// Size of the header (always load the first n bytes)
+#define CachedFileHeaderSize 32768
+
 //------------------------------------------------------------------------
 // CachedFile
 //------------------------------------------------------------------------
@@ -141,12 +144,17 @@ size_t CachedFile::read(void *ptr, size_t unitsize, size_t count)
   }
 
   if (bytes == 0) return 0;
+  
+  // If the first block is requested, we'll actually cache a bit more than what
+  // the user requested. This is a quick fix to make reading the header faster.
+  size_t toCopy = bytes;
+  if (streamPos == 0 && bytes < CachedFileHeaderSize && CachedFileHeaderSize < length)
+    bytes = CachedFileHeaderSize;
 
   // Load data
   if (cache(streamPos, bytes) != 0) return 0;
 
   // Copy data to buffer
-  size_t toCopy = bytes;
   while (toCopy) {
     int chunk = streamPos / CachedFileChunkSize;
     int offset = streamPos % CachedFileChunkSize;
