@@ -12,7 +12,7 @@
 #include <config.h>
 
 #include "StdinPDFDocBuilder.h"
-#include "CachedFile.h"
+#include "MemoryCachedFile.h"
 #include "StdinCachedFile.h"
 
 //------------------------------------------------------------------------
@@ -26,7 +26,7 @@ StdinPDFDocBuilder::buildPDFDoc(const GooString &uri, GooString *ownerPassword,
   Object obj;
 
   obj.initNull();
-  CachedFile *cachedFile = new CachedFile(new StdinCacheLoader(), NULL);
+  CachedFile *cachedFile = new MemoryCachedFile(new StdinCacheLoader(), NULL);
   return new PDFDoc(new CachedFileStream(cachedFile, 0, gFalse,
                                          cachedFile->getLength(), &obj),
                     ownerPassword, userPassword);

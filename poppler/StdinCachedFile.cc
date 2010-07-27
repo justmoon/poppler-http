@@ -20,7 +20,7 @@
 #endif
 #include <stdio.h>
 
-size_t StdinCacheLoader::init(GooString *dummy, CachedFile *cachedFile)
+int StdinCacheLoader::load(const GooVector<ByteRange> &ranges, CachedFileWriter *writer)
 {
   size_t read, size = 0;
   char buf[CachedFileChunkSize];
@@ -29,19 +29,15 @@ size_t StdinCacheLoader::init(GooString *dummy, CachedFile *cachedFile)
   setmode(fileno(stdin), O_BINARY);
 #endif
 
-  CachedFileWriter writer = CachedFileWriter (cachedFile, NULL);
+  writer->noteNonPartial();
   do {
     read = fread(buf, 1, CachedFileChunkSize, stdin);
-    (writer.write) (buf, CachedFileChunkSize);
+    (writer->write) (buf, CachedFileChunkSize);
     size += read;
   }
   while (read == CachedFileChunkSize);
+  writer->eof();
 
-  return size;
-}
-
-int StdinCacheLoader::load(const GooVector<ByteRange> &ranges, CachedFileWriter *writer)
-{
   return 0;
 }
 
