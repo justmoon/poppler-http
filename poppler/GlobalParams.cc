@@ -686,6 +686,7 @@ GlobalParams::GlobalParams(const char *customPopplerDataDir)
   screenGamma = 1.0;
   screenBlackThreshold = 0.0;
   screenWhiteThreshold = 1.0;
+  useSharedMemoryCache = gTrue;
   mapNumericCharNames = gTrue;
   mapUnknownCharNames = gFalse;
   printCommands = gFalse;
@@ -1531,6 +1532,15 @@ double GlobalParams::getScreenWhiteThreshold() {
   return thresh;
 }
 
+GBool GlobalParams::getSharedMemoryCache() {
+  GBool useShared;
+
+  lockGlobalParams;
+  useShared = useSharedMemoryCache;
+  unlockGlobalParams;
+  return useShared;
+}
+
 GBool GlobalParams::getMapNumericCharNames() {
   GBool map;
 
@@ -1846,6 +1856,13 @@ void GlobalParams::setScreenWhiteThreshold(double whiteThreshold)
 {
   lockGlobalParams;
   screenWhiteThreshold = whiteThreshold;
+  unlockGlobalParams;
+}
+
+void GlobalParams::setSharedMemoryCache(GBool useShared)
+{
+  lockGlobalParams;
+  useSharedMemoryCache = useShared;
   unlockGlobalParams;
 }
 

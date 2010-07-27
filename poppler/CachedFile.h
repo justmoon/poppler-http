@@ -42,44 +42,55 @@ class CachedFile {
 
 friend class CachedFileWriter;
 
-public:
-
-  CachedFile(CachedFileLoader *cacheLoader, GooString *uri);
-
-  Guint getLength() { return length; }
-  long int tell();
-  int seek(long int offset, int origin);
-  size_t read(void * ptr, size_t unitsize, size_t count);
-  size_t write(const char *ptr, size_t size, size_t fromByte);
-  int cache(const GooVector<ByteRange> &ranges);
-
-  // Reference counting.
-  void incRefCnt();
-  void decRefCnt();
-
-private:
-
-  ~CachedFile();
+protected:
 
   enum ChunkState {
     chunkStateNew = 0,
     chunkStateLoaded
   };
 
-  typedef struct {
-    ChunkState state;
-    char data[CachedFileChunkSize];
-  } Chunk;
+public:
+
+  CachedFile(CachedFileLoader *cacheLoader, GooString *uri);
+
+  Guint getLength();
+  CachedFileLoader *getLoader();
+  
+  long int tell();
+  int seek(long int offset, int origin);
+  size_t read(void * ptr, size_t unitsize, size_t count);
+  size_t write(const char *ptr, size_t size, size_t fromByte);
+  int cache(const GooVector<ByteRange> &ranges);
+  
+  virtual size_t getCacheSize() = 0;
+  virtual void resizeCache(size_t numChunks) = 0;
+  virtual ChunkState getChunkState(int chunk) = 0;
+  virtual void setChunkState(int chunk, ChunkState value) = 0;
+  virtual const char *getChunkPointer(int chunkId) = 0;
+  virtual char *startChunkUpdate(int chunkId) = 0;
+  virtual void endChunkUpdate(int chunkId) = 0;
+
+  // Reference counting.
+  void incRefCnt();
+  void decRefCnt();
+
+protected:
+
+  virtual ~CachedFile();
+  
+  void setLength(Guint lengthA);
+
+  GooString *uri;
+  
+private:
 
   int cache(size_t offset, size_t length);
 
   CachedFileLoader *loader;
-  GooString *uri;
+  GBool loaderIsInitialized;
 
-  size_t length;
   size_t streamPos;
-
-  GooVector<Chunk> *chunks;
+  Guint length;
 
   int refCnt;  // reference count
 

@@ -13,8 +13,10 @@
 
 #include "CurlPDFDocBuilder.h"
 
-#include "CachedFile.h"
+#include "MemoryCachedFile.h"
+#include "SharedCachedFile.h"
 #include "CurlCachedFile.h"
+#include "GlobalParams.h"
 
 //------------------------------------------------------------------------
 // CurlPDFDocBuilder
@@ -25,9 +27,15 @@ CurlPDFDocBuilder::buildPDFDoc(const GooString &uri,
         GooString *ownerPassword, GooString *userPassword, void *guiDataA)
 {
     Object obj;
+    CachedFile *cachedFile;
 
-    CachedFile *cachedFile = new CachedFile(
-        new CurlCachedFileLoader(), uri.copy());
+	if (globalParams->getSharedMemoryCache()) {
+		cachedFile = new SharedCachedFile(
+	        new CurlCachedFileLoader(), uri.copy());
+	} else {
+	    cachedFile = new MemoryCachedFile(
+	        new CurlCachedFileLoader(), uri.copy());
+	}
 
     obj.initNull();
     BaseStream *str = new CachedFileStream(
