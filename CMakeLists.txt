@@ -219,6 +219,7 @@ set(poppler_SRCS
   goo/JpegWriter.cc
   goo/ImgWriter.cc
   goo/gstrtod.cc
+  goo/sha1.cc
   fofi/FoFiBase.cc
   fofi/FoFiEncodings.cc
   fofi/FoFiTrueType.cc
@@ -252,6 +253,7 @@ set(poppler_SRCS
   poppler/Link.cc
   poppler/Linearization.cc
   poppler/LocalPDFDocBuilder.cc
+  poppler/MemoryCachedFile.cc
   poppler/NameToCharCode.cc
   poppler/Object.cc
   poppler/OptionalContent.cc
@@ -267,6 +269,7 @@ set(poppler_SRCS
   poppler/ProfileData.cc
   poppler/PreScanOutputDev.cc
   poppler/PSTokenizer.cc
+  poppler/SharedCachedFile.cc
   poppler/Stream.cc
   poppler/strtok_r.cpp
   poppler/UnicodeMap.cc
@@ -455,6 +458,7 @@ if(ENABLE_XPDF_HEADERS)
     goo/ImgWriter.h
     goo/GooLikely.h
     goo/gstrtod.h
+    goo/sha1.h
     DESTINATION include/poppler/goo)
   if(PNG_FOUND)
     install(FILES

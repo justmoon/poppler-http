@@ -214,6 +214,7 @@ public:
   double getScreenGamma();
   double getScreenBlackThreshold();
   double getScreenWhiteThreshold();
+  GBool getSharedMemoryCache();
   GBool getMapNumericCharNames();
   GBool getMapUnknownCharNames();
   GBool getPrintCommands();
@@ -258,6 +259,7 @@ public:
   void setScreenGamma(double gamma);
   void setScreenBlackThreshold(double blackThreshold);
   void setScreenWhiteThreshold(double whiteThreshold);
+  void setSharedMemoryCache(GBool useShared);
   void setMapNumericCharNames(GBool map);
   void setMapUnknownCharNames(GBool map);
   void setPrintCommands(GBool printCommandsA);
@@ -342,6 +344,7 @@ private:
   double screenGamma;		// screen gamma correction
   double screenBlackThreshold;	// screen black clamping threshold
   double screenWhiteThreshold;	// screen white clamping threshold
+  GBool useSharedMemoryCache;   // whether to use shm_open to share file caches
   GBool mapNumericCharNames;	// map numeric char names (from font subsets)?
   GBool mapUnknownCharNames;	// map unknown char names?
   GBool printCommands;		// print the drawing commands
