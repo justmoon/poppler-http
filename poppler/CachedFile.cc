@@ -24,22 +24,18 @@ CachedFile::CachedFile(CachedFileLoader *cachedFileLoaderA, GooString *uriA)
 {
   uri = uriA;
   loader = cachedFileLoaderA;
+  loaderIsInitialized = gFalse;
 
   streamPos = 0;
-  chunks = new GooVector<Chunk>();
   length = 0;
 
-  length = loader->init(uri, this);
   refCnt = 1;
-
-  chunks->resize(length/CachedFileChunkSize + 1);
 }
 
 CachedFile::~CachedFile()
 {
   delete uri;
   delete loader;
-  delete chunks;
 }
 
 void CachedFile::incRefCnt() {
@@ -49,6 +45,28 @@ void CachedFile::incRefCnt() {
 void CachedFile::decRefCnt() {
   if (--refCnt == 0)
     delete this;
+}
+
+Guint CachedFile::getLength()
+{
+  if (length == 0 && !loaderIsInitialized) getLoader();
+  
+  return length;
+}
+
+void CachedFile::setLength(Guint lengthA)
+{
+  length = lengthA;
+}
+
+CachedFileLoader *CachedFile::getLoader()
+{
+  if (!loaderIsInitialized) {
+    length = loader->init(uri, this);
+    loaderIsInitialized = gTrue;
+  }
+  
+  return loader;
 }
 
 long int CachedFile::tell() {
@@ -103,7 +121,7 @@ int CachedFile::cache(const GooVector<ByteRange> &origRanges)
     startChunk = start / CachedFileChunkSize;
     endChunk = end / CachedFileChunkSize;
     for (int chunk = startChunk; chunk <= endChunk; chunk++) {
-      if ((*chunks)[chunk].state == chunkStateNew) {
+      if (getChunkState(chunk) == chunkStateNew) {
            chunkNeeded[chunk] = true;
       }
     }
@@ -128,6 +146,8 @@ int CachedFile::cache(const GooVector<ByteRange> &origRanges)
   }
 
   if (chunk_ranges.size() > 0) {
+    if (!loaderIsInitialized) getLoader();
+    
     CachedFileWriter writer =
         CachedFileWriter(this, &loadChunks);
     return loader->load(chunk_ranges, &writer);
@@ -163,7 +183,10 @@ size_t CachedFile::read(void *ptr, size_t unitsize, size_t count)
     if (len > toCopy)
       len = toCopy;
 
-    memcpy(ptr, (*chunks)[chunk].data + offset, len);
+    char *data = startChunkUpdate(chunk);
+    memcpy(ptr, data + offset, len);
+    endChunkUpdate(chunk);
+    
     streamPos += len;
     toCopy -= len;
     ptr = (char*)ptr + len;
@@ -224,13 +247,15 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
       chunk = cachedFile->length / CachedFileChunkSize;
     }
 
-    if (chunk >= cachedFile->chunks->size()) {
-       cachedFile->chunks->resize(chunk + 1);
+    if (chunk >= cachedFile->getCacheSize()) {
+       cachedFile->resizeCache(chunk + 1);
     }
 
     nfree = CachedFileChunkSize - offset;
     ncopy = (len >= nfree) ? nfree : len;
-    memcpy(&((*cachedFile->chunks)[chunk].data[offset]), cp, ncopy);
+    char *data = cachedFile->startChunkUpdate(chunk);
+    memcpy(&(data[offset]), cp, ncopy);
+    cachedFile->endChunkUpdate(chunk);
     len -= ncopy;
     cp += ncopy;
     offset += ncopy;
@@ -241,13 +266,13 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
     }
 
     if (offset == CachedFileChunkSize) {
-       (*cachedFile->chunks)[chunk].state = CachedFile::chunkStateLoaded;
+       cachedFile->setChunkState(chunk, CachedFile::chunkStateLoaded);
     }
   }
 
   if ((chunk == (cachedFile->length / CachedFileChunkSize)) &&
       (offset == (cachedFile->length % CachedFileChunkSize))) {
-     (*cachedFile->chunks)[chunk].state = CachedFile::chunkStateLoaded;
+    cachedFile->setChunkState(chunk, CachedFile::chunkStateLoaded);
   }
 
   return written;

@@ -42,4 +42,5 @@ libgoo_la_SOURCES =				\
 	PNGWriter.cc				\
 	JpegWriter.cc				\
 	ImgWriter.cc				\
-	gstrtod.cc
+	gstrtod.cc				\
+	sha1.cc

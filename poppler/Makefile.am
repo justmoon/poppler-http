@@ -293,6 +293,7 @@ libpoppler_la_SOURCES =		\
 	Linearization.cc 	\
 	Link.cc 		\
 	LocalPDFDocBuilder.cc	\
+	MemoryCachedFile.cc	\
 	Movie.cc                \
 	NameToCharCode.cc	\
 	Object.cc 		\
@@ -310,6 +311,7 @@ libpoppler_la_SOURCES =		\
 	PreScanOutputDev.cc \
 	PSTokenizer.cc		\
 	Rendition.cc		\
+	SharedCachedFile.cc	\
 	StdinCachedFile.cc	\
 	StdinPDFDocBuilder.cc	\
 	Stream.cc 		\
