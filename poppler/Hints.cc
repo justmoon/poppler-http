@@ -41,7 +41,7 @@ Hints::Hints(BaseStream *str, Linearization *linearization)
   pageLength = (Guint *) gmallocn(nPages, sizeof(Guint));
   pageOffset = (Guint *) gmallocn(nPages, sizeof(Guint));
   numSharedObject = (Guint *) gmallocn(nPages, sizeof(Guint));
-  sharedObjectId = (Guint **) gmallocn(nPages, sizeof(Guint));
+  sharedObjectId = (Guint **) gmallocn(nPages, sizeof(Guint*));
   if (!nObjects || !xRefOffset || !pageLength || !pageOffset ||
       !numSharedObject || !sharedObjectId) {
     error(-1, "Failed to allocate memory for hints tabel");
