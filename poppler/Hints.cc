@@ -48,7 +48,8 @@ Hints::Hints(BaseStream *str, Linearization *linearization)
     nPages = 0;
   }
 
-  memset(numSharedObject, 0, nPages);
+  memset(numSharedObject, 0, nPages*sizeof(Guint));
+  memset(sharedObjectId, 0, nPages*sizeof(Guint*));
 
   nSharedGroups = 0;
   groupLength = NULL;
@@ -67,7 +68,9 @@ Hints::~Hints()
   gfree(pageLength);
   gfree(pageOffset);
   gfree(numSharedObject);
-  for (int i=0; i< nPages; i++) gfree(sharedObjectId[i]);
+  for (int i=0; i< nPages; i++) {
+    if (sharedObjectId[i]) gfree(sharedObjectId[i]);
+  }
   gfree(sharedObjectId);
 
   gfree(groupLength);
@@ -117,19 +120,25 @@ void Hints::readTables(BaseStream *str, Linearization *linearization)
      (obj.free(), parser->getObj(&obj)->isStream())){
     Stream *hintsStream = obj.getStream();
     Dict *hintsDict = obj.streamGetDict();
-
-    int sharedStreamOffset = 0;
-    if (hintsDict->lookupInt("S", NULL, &sharedStreamOffset) &&
+    
+    hintsStream->reset();
+    if (hintsStream->getChar() != EOF) {
+      int sharedStreamOffset = 0;
+      if (hintsDict->lookupInt("S", NULL, &sharedStreamOffset) &&
         sharedStreamOffset > 0) {
-
+          
         hintsStream->reset();
         readPageOffsetTable(hintsStream);
 
         hintsStream->reset();
         for (int i=0; i<sharedStreamOffset; i++) hintsStream->getChar();
         readSharedObjectsTable(hintsStream);
+      } else {
+        error(-1, "Invalid shared object hint table offset");
+      }
     } else {
-      error(-1, "Invalid shared object hint table offset");
+      error(-1, "Could not read hints stream");
+      return;
     }
   } else {
     error(-1, "Failed parsing hints table object");
