@@ -48,6 +48,7 @@ Hints::Hints(BaseStream *str, Linearization *linearization)
     nPages = 0;
   }
 
+  memset(pageOffset, 0, nPages*sizeof(Guint));
   memset(numSharedObject, 0, nPages*sizeof(Guint));
   memset(sharedObjectId, 0, nPages*sizeof(Guint*));
 

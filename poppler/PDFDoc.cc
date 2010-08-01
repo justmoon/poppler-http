@@ -1145,7 +1145,11 @@ Page *PDFDoc::getPage(int page)
       }
     }
     if (!pageCache[page-1]) {
-      pageCache[page-1] = parsePage(getPageOffset(page), page);
+      Guint offset = getPageOffset(page);
+      
+      if (!offset) return catalog->getPage(page);
+      
+      pageCache[page-1] = parsePage(offset, page);
       if (!pageCache[page-1]) {
          error(-1, "Failed parsing page %d at offset %d",
                page, getPageOffset(page));
