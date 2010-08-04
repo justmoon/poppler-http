@@ -99,6 +99,7 @@ void PDFDoc::init()
   outline = NULL;
 #endif
   startXRefPos = ~(Guint)0;
+  secHdlr = NULL;
 }
 
 PDFDoc::PDFDoc()
@@ -258,6 +259,7 @@ GBool PDFDoc::setup(GooString *ownerPassword, GooString *userPassword) {
 }
 
 PDFDoc::~PDFDoc() {
+  delete secHdlr;
 #ifndef DISABLE_OUTLINE
   if (outline) {
     delete outline;
@@ -354,7 +356,6 @@ void PDFDoc::checkHeader() {
 GBool PDFDoc::checkEncryption(GooString *ownerPassword, GooString *userPassword) {
   Object encrypt;
   GBool encrypted;
-  SecurityHandler *secHdlr;
   GBool ret;
 
   xref->getTrailerDict()->dictLookup("Encrypt", &encrypt);
@@ -374,7 +375,6 @@ GBool PDFDoc::checkEncryption(GooString *ownerPassword, GooString *userPassword)
 	// authorization failed
 	ret = gFalse;
       }
-      delete secHdlr;
     } else {
       // couldn't find the matching security handler
       ret = gFalse;
