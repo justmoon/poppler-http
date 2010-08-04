@@ -49,6 +49,7 @@ class LinkAction;
 class LinkDest;
 class Outline;
 class Linearization;
+class SecurityHandler;
 
 enum PDFWriteMode {
   writeStandard,
@@ -257,6 +258,7 @@ private:
   int pdfMinorVersion;
   Linearization *linearization;
   XRef *xref;
+  SecurityHandler *secHdlr;
   Catalog *catalog;
 #ifndef DISABLE_OUTLINE
   Outline *outline;
