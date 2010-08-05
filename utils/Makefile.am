@@ -61,6 +61,7 @@ bin_PROGRAMS =					\
 	pdfinfo					\
 	pdftops					\
 	pdftotext				\
+	pdfkeywords				\
 	pdftohtml				\
 	pdfexref				\
 	$(pdftoppm_binary)			\
@@ -103,6 +104,10 @@ pdftotext_SOURCES =				\
 	pdftotext.cc				\
 	printencodings.cc			\
 	printencodings.h			\
+	$(common)
+
+pdfkeywords_SOURCES =				\
+	pdfkeywords.cc				\
 	$(common)
 
 pdftohtml_SOURCES =				\
