@@ -39,6 +39,15 @@ if (HAVE_CAIRO)
   install(FILES pdftocairo.1 DESTINATION share/man/man1)
 endif (HAVE_CAIRO)
 
+# pdfexref
+set(pdfexref_SOURCES ${common_srcs}
+  pdfexref.cc
+)
+add_executable(pdfexref ${pdffonts_SOURCES})
+target_link_libraries(pdfexref ${common_libs})
+install(TARGETS pdfexref DESTINATION bin)
+install(FILES pdfexref.1 DESTINATION share/man/man1)
+
 # pdffonts
 set(pdffonts_SOURCES ${common_srcs}
   pdffonts.cc
