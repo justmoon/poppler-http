@@ -46,7 +46,7 @@ set(pdfexref_SOURCES ${common_srcs}
 add_executable(pdfexref ${pdfexref_SOURCES})
 target_link_libraries(pdfexref ${common_libs})
 install(TARGETS pdfexref DESTINATION bin)
-install(FILES pdfexref.1 DESTINATION share/man/man1)
+#install(FILES pdfexref.1 DESTINATION share/man/man1)
 
 # pdffonts
 set(pdffonts_SOURCES ${common_srcs}
