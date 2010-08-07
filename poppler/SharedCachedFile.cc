@@ -118,8 +118,6 @@ void *SharedCachedFile::mapFile(int fd, size_t len)
 {
   void *ptr;
 
-  printf("Map %d\n", len);
-
   if (ftruncate(fd, len)) {
     error(-1, "Unable to resize shared memory data");
     exit(1);
@@ -136,8 +134,6 @@ void *SharedCachedFile::mapFile(int fd, size_t len)
 
 void *SharedCachedFile::remapFile(int fd, void *ptr, size_t oldLen, size_t newLen)
 {
-  printf("Remap %d->%d\n", oldLen, newLen);
-  
   if (ftruncate(fd, newLen)) {
     error(-1, "Unable to resize shared memory data");
     exit(1);
