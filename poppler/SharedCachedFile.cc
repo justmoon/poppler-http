@@ -33,7 +33,6 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   GooString *filename;
   struct stat datastat;
   
-  
   sha1::calc(uriA->getCString(), uriA->getLength(), hash);
   sha1::toHexString(hash, hexstring);
   
@@ -43,24 +42,7 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   
   datafd = shm_open(filename->getCString(), O_RDWR | O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
   if (datafd < 0) {
-    error(-1, "Unable to access shared memory");
-    exit(1);
-  }
-  
-  // Load the size from the cache file if we have one
-  fstat(datafd, &datastat);
-  if (datastat.st_size) {
-    setLength(datastat.st_size);
-  }
-  
-  if (ftruncate(datafd, getLength())) {
-    error(-1, "Unable to resize shared memory");
-    exit(1);
-  }
-  
-  data = (char *) mmap(NULL, getLength(), PROT_READ | PROT_WRITE, MAP_SHARED, datafd, 0);
-  if (data == NULL) {
-    error(-1, "Unable to map shared memory");
+    error(-1, "Unable to access shared memory data");
     exit(1);
   }
   
@@ -69,54 +51,105 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   
   metafd = shm_open(filename->getCString(), O_RDWR | O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
   if (metafd < 0) {
-    error(-1, "Unable to access shared memory");
-    exit(1);
-  }
-  
-  cacheSize = getLength()/CachedFileChunkSize + 1;
-  if (ftruncate(metafd, cacheSize*sizeof(ChunkState))) {
-    error(-1, "Unable to resize shared memory");
-    exit(1);
-  }
-  
-  meta = (ChunkState *) mmap(NULL, cacheSize*sizeof(ChunkState), PROT_READ | PROT_WRITE, MAP_SHARED, metafd, 0);
-  if (meta == NULL) {
-    error(-1, "Unable to map shared memory");
+    error(-1, "Unable to access shared memory metadata");
     exit(1);
   }
   
   delete filename;
+  
+  // Load the size from the cache file if we have one
+  fstat(datafd, &datastat);
+  if (datastat.st_size) {
+    setLength(datastat.st_size);
+  } else {
+  	loadHeader();
+  }
 }
 
 SharedCachedFile::~SharedCachedFile()
 {
 }
 
-void SharedCachedFile::resizeCache(size_t numChunks)
+void SharedCachedFile::setLength(Guint lengthA)
 {
-  if (ftruncate(datafd, numChunks*CachedFileChunkSize)) {
-    error(-1, "Unable to resize shared memory");
-    exit(1);
+  size_t numChunks = lengthA/CachedFileChunkSize + 1;
+  
+  if (length == lengthA) return;
+  
+  CachedFile::setLength(lengthA);
+  
+  if (!data) {
+    data = (char *) mapFile(datafd, length);
+  } else {
+    data = (char *) remapFile(datafd, (void *)data, numChunks*CachedFileChunkSize, length);
   }
   
-  if (ftruncate(metafd, numChunks*sizeof(ChunkState))) {
-    error(-1, "Unable to resize shared memory");
-    exit(1);
-  }
-  
-  data = (char *) mremap(data, cacheSize*CachedFileChunkSize, numChunks*CachedFileChunkSize, MREMAP_MAYMOVE);
-  if (data == MAP_FAILED) {
-    error(-1, "mremap failed");
-    exit(1);
-  }
-  
-  meta = (ChunkState *) mremap(meta, cacheSize*sizeof(ChunkState), numChunks*sizeof(ChunkState), MREMAP_MAYMOVE);
-  if (meta == MAP_FAILED) {
-    error(-1, "mremap failed");
-    exit(1);
+  if (!meta) {
+    meta = (ChunkState *) mapFile(metafd, numChunks*sizeof(ChunkState));
+  } else {
+    meta = (ChunkState *) remapFile(metafd, (void *)meta, cacheSize*sizeof(ChunkState), numChunks*sizeof(ChunkState));
   }
   
   cacheSize = numChunks;
+}
+
+void SharedCachedFile::reserveCacheSpace(size_t len)
+{
+  size_t numChunks = len/CachedFileChunkSize + 1;
+  
+  if (lengthKnown) return;
+  
+  if (!data) {
+    data = (char *) mapFile(datafd, numChunks*CachedFileChunkSize);
+  } else {
+    data = (char *) remapFile(datafd, (void *)data, cacheSize*CachedFileChunkSize, numChunks*CachedFileChunkSize);
+  }
+  
+  if (!meta) {
+    meta = (ChunkState *) mapFile(metafd, numChunks*sizeof(ChunkState));
+  } else {
+    meta = (ChunkState *) remapFile(metafd, (void *)meta, cacheSize*sizeof(ChunkState), numChunks*sizeof(ChunkState));
+  }
+  
+  cacheSize = numChunks;
+}
+
+void *SharedCachedFile::mapFile(int fd, size_t len)
+{
+  void *ptr;
+
+  printf("Map %d\n", len);
+
+  if (ftruncate(fd, len)) {
+    error(-1, "Unable to resize shared memory data");
+    exit(1);
+  }
+  
+  ptr = (void *) mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (ptr == NULL) {
+    error(-1, "Unable to map shared memory");
+    exit(1);
+  }
+  
+  return ptr;
+}
+
+void *SharedCachedFile::remapFile(int fd, void *ptr, size_t oldLen, size_t newLen)
+{
+  printf("Remap %d->%d\n", oldLen, newLen);
+  
+  if (ftruncate(fd, newLen)) {
+    error(-1, "Unable to resize shared memory data");
+    exit(1);
+  }
+  
+  ptr = (void *) mremap(ptr, oldLen, newLen, MREMAP_MAYMOVE);
+  if (ptr == MAP_FAILED) {
+    error(-1, "mremap failed");
+    exit(1);
+  }
+  
+  return ptr;
 }
 
 //------------------------------------------------------------------------

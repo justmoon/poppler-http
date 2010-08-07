@@ -22,20 +22,34 @@
 
 CachedFile::CachedFile(CachedFileLoader *cachedFileLoaderA, GooString *uriA)
 {
-  uri = uriA;
   loader = cachedFileLoaderA;
-  loaderIsInitialized = gFalse;
+  uri = uriA;
+  
+  loader->setUrl(uri);
 
   streamPos = 0;
   length = 0;
+  lengthKnown = gFalse;
 
   refCnt = 1;
 }
 
 CachedFile::~CachedFile()
 {
-  delete uri;
   delete loader;
+  delete uri;
+}
+
+void CachedFile::loadHeader()
+{
+  ByteRange headerRange;
+  GooVector<ByteRange> *v = new GooVector<ByteRange>;
+
+  headerRange.offset = 0;
+  headerRange.length = CachedFileHeaderSize;
+  v->push_back(headerRange);
+  
+  cache(*v);
 }
 
 void CachedFile::incRefCnt() {
@@ -49,23 +63,19 @@ void CachedFile::decRefCnt() {
 
 Guint CachedFile::getLength()
 {
-  if (length == 0 && !loaderIsInitialized) getLoader();
-  
+  if (!lengthKnown) loadHeader();
+
   return length;
 }
 
 void CachedFile::setLength(Guint lengthA)
 {
   length = lengthA;
+  lengthKnown = gTrue;
 }
 
 CachedFileLoader *CachedFile::getLoader()
 {
-  if (!loaderIsInitialized) {
-    length = loader->init(uri, this);
-    loaderIsInitialized = gTrue;
-  }
-  
   return loader;
 }
 
@@ -83,7 +93,7 @@ int CachedFile::seek(long int offset, int origin)
     streamPos = length + offset;
   }
 
-  if (streamPos > length) {
+  if (lengthKnown && streamPos > length) {
     streamPos = 0;
     return 1;
   }
@@ -94,22 +104,26 @@ int CachedFile::seek(long int offset, int origin)
 int CachedFile::cache(const GooVector<ByteRange> &origRanges)
 {
   GooVector<int> loadChunks;
-  int numChunks = length/CachedFileChunkSize + 1;
-  GooVector<bool> chunkNeeded(numChunks);
+  int numChunks;
   int startChunk, endChunk;
   GooVector<ByteRange> chunk_ranges, all;
   ByteRange range;
   const GooVector<ByteRange> *ranges = &origRanges;
+  size_t i;
 
-  if (ranges->empty()) {
-    range.offset = 0;
-    range.length = length;
-    all.push_back(range);
-    ranges = &all;
+  if (!lengthKnown) {
+    size_t rangeMax;
+    for (i = 0; i < ranges->size(); i++) {
+      rangeMax = (*ranges)[i].offset + (*ranges)[i].length;
+      if (rangeMax > length) length = rangeMax;
+    }
   }
+  
+  numChunks = length/CachedFileChunkSize + 1;
 
+  GooVector<bool> chunkNeeded(numChunks);
   memset(&chunkNeeded[0], 0, sizeof(bool) * numChunks);
-  for (size_t i = 0; i < ranges->size(); i++) {
+  for (i = 0; i < ranges->size(); i++) {
 
     if ((*ranges)[i].length == 0) continue;
     if ((*ranges)[i].offset >= length) continue;
@@ -146,8 +160,6 @@ int CachedFile::cache(const GooVector<ByteRange> &origRanges)
   }
 
   if (chunk_ranges.size() > 0) {
-    if (!loaderIsInitialized) getLoader();
-    
     CachedFileWriter writer =
         CachedFileWriter(this, &loadChunks);
     return loader->load(chunk_ranges, &writer);
@@ -213,6 +225,7 @@ CachedFileWriter::CachedFileWriter(CachedFile *cachedFileA, GooVector<int> *chun
 {
    cachedFile = cachedFileA;
    chunks = chunksA;
+   pos = 0;
 
    if (chunks) {
      offset = 0;
@@ -222,6 +235,18 @@ CachedFileWriter::CachedFileWriter(CachedFile *cachedFileA, GooVector<int> *chun
 
 CachedFileWriter::~CachedFileWriter()
 {
+}
+
+void CachedFileWriter::noteNonPartial()
+{
+  offset = 0;
+  chunks = NULL;
+  pos = 0;
+}
+
+void CachedFileWriter::setLength(size_t len)
+{
+  cachedFile->setLength(len);
 }
 
 size_t CachedFileWriter::write(const char *ptr, size_t size)
@@ -243,12 +268,12 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
       }
       chunk = *it;
     } else {
-      offset = cachedFile->length % CachedFileChunkSize;
-      chunk = cachedFile->length / CachedFileChunkSize;
+      offset = pos % CachedFileChunkSize;
+      chunk = pos / CachedFileChunkSize;
     }
 
     if (chunk >= cachedFile->getCacheSize()) {
-       cachedFile->resizeCache(chunk + 1);
+       cachedFile->reserveCacheSpace((chunk+1) * CachedFileChunkSize);
     }
 
     nfree = CachedFileChunkSize - offset;
@@ -262,7 +287,7 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
     written += ncopy;
 
     if (!chunks) {
-      cachedFile->length += ncopy;
+      pos += ncopy;
     }
 
     if (offset == CachedFileChunkSize) {
@@ -270,12 +295,28 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
     }
   }
 
-  if ((chunk == (cachedFile->length / CachedFileChunkSize)) &&
+  if (cachedFile->lengthKnown &&
+      (chunk == (cachedFile->length / CachedFileChunkSize)) &&
       (offset == (cachedFile->length % CachedFileChunkSize))) {
     cachedFile->setChunkState(chunk, CachedFile::chunkStateLoaded);
   }
 
   return written;
+}
+
+void CachedFileWriter::eof()
+{
+  size_t chunk;
+  
+  // At the end of a non-partial file with unknown length
+  if (!chunks && !cachedFile->lengthKnown) {
+    // Store final file size
+    setLength(pos);
+    
+    // Set last chunk's status to chunkStateLoaded
+    chunk = pos / CachedFileChunkSize;
+    cachedFile->setChunkState(chunk, CachedFile::chunkStateLoaded);
+  }
 }
 
 //------------------------------------------------------------------------

@@ -18,7 +18,7 @@ class StdinCacheLoader : public CachedFileLoader {
 
 public:
 
-  size_t init(GooString *dummy, CachedFile* cachedFile);
+  void setUrl(GooString *urlA) {}
   int load(const GooVector<ByteRange> &ranges, CachedFileWriter *writer);
 
 };
