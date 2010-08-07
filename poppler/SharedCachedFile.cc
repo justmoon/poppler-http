@@ -32,6 +32,7 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   char hexstring[41];
   GooString *filename;
   struct stat datastat;
+  mode_t oldmask;
   
   sha1::calc(uriA->getCString(), uriA->getLength(), hash);
   sha1::toHexString(hash, hexstring);
@@ -39,6 +40,8 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   // Open shared data memory
   filename = new GooString("poppler-");
   filename->append(hexstring);
+  
+  oldmask = umask(0);
   
   datafd = shm_open(filename->getCString(), O_RDWR | O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
   if (datafd < 0) {
@@ -54,6 +57,8 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
     error(-1, "Unable to access shared memory metadata");
     exit(1);
   }
+  
+  umask(oldmask);
   
   delete filename;
   
