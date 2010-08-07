@@ -19,6 +19,10 @@
 
 //------------------------------------------------------------------------
 
+class CurlCachedFileLoader;
+
+//------------------------------------------------------------------------
+
 enum CurlCachedFileResponseState{
 	curlResponseStatePreamble,
 	curlResponseStateMeta,
@@ -32,13 +36,14 @@ class CurlCachedFileResponseHandler {
 
 public:
 
-  CurlCachedFileResponseHandler(CachedFileWriter *writerA);
+  CurlCachedFileResponseHandler(CurlCachedFileLoader *loaderA, CachedFileWriter *writerA);
   ~CurlCachedFileResponseHandler();
   size_t handleHeader(const char *ptr, size_t len);
   size_t handleBody(const char *ptr, size_t len);
 
 private:
 
+  CurlCachedFileLoader *loader;
   CachedFileWriter *writer;
   GooString *boundary;
   CurlCachedFileResponseState state;
@@ -46,11 +51,13 @@ private:
   size_t bufferPos;
   size_t bufferLen;
   size_t dataLen;
+  GBool isNonPartial;
   
   static void trim(GooString *subject);
   static GooString *getHeaderValue(const char *headerString, size_t len);
   static char *getNextHeader(char *bufferA);
   void enableMultipart(const char *boundaryA);
+  void parseContentRange(const GooString *value);
 
 };
 
@@ -58,17 +65,22 @@ private:
 
 class CurlCachedFileLoader : public CachedFileLoader {
 
+friend class CurlCachedFileResponseHandler;
+
 public:
 
   CurlCachedFileLoader();
   ~CurlCachedFileLoader();
-  size_t init(GooString *url, CachedFile* cachedFile);
+  
+  void setUrl(GooString *urlA);
+  
   int load(const GooVector<ByteRange> &ranges, CachedFileWriter *writer);
+  
+  long getLatestHttpStatus();
 
 private:
 
   GooString *url;
-  CachedFile *cachedFile;
   CURL *curl;
 
 };

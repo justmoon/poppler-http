@@ -22,8 +22,9 @@
 //------------------------------------------------------------------------
 
 // Initial length of the response buffer handler
-#define RESPONSE_HANDLER_BUFFER_LEN 1024
+#define RESPONSE_HANDLER_BUFFER_LEN 32768
 
+const char httpInitial[] = "HTTP";
 const char httpContentLength[] = "content-length";
 const char httpContentType[] = "content-type";
 const char httpContentRange[] = "content-range";
@@ -39,8 +40,10 @@ const char mimeValueSeparator = '=';
 // CurlCachedFileResponseHandler
 //------------------------------------------------------------------------
 
-CurlCachedFileResponseHandler::CurlCachedFileResponseHandler(CachedFileWriter *writerA)
+CurlCachedFileResponseHandler::CurlCachedFileResponseHandler(CurlCachedFileLoader *loaderA,
+    CachedFileWriter *writerA)
 {
+	loader = loaderA;
 	writer = writerA;
 	boundary = NULL;
 	state = curlResponseStateData;
@@ -48,6 +51,8 @@ CurlCachedFileResponseHandler::CurlCachedFileResponseHandler(CachedFileWriter *w
 	buffer = (char*)malloc(RESPONSE_HANDLER_BUFFER_LEN);
 	bufferLen = RESPONSE_HANDLER_BUFFER_LEN;
 	bufferPos = 0;
+	
+	isNonPartial = gFalse;
 }
 
 CurlCachedFileResponseHandler::~CurlCachedFileResponseHandler()
@@ -149,16 +154,23 @@ size_t CurlCachedFileResponseHandler::handleHeader(const char *ptr, size_t len)
 {
   GooString *value;
   
-  if (strncasecmp(ptr, httpContentLength, strlen(httpContentLength)) == 0) {
+  if (strncasecmp(ptr, httpInitial, strlen(httpInitial)) == 0) {
+	  if (loader->getLatestHttpStatus() == 200) {
+	    // HTTP status 200 means we're about to receive a full file response
+	    writer->noteNonPartial();
+	    isNonPartial = gTrue;
+	  }
+	} else if (strncasecmp(ptr, httpContentLength, strlen(httpContentLength)) == 0) {
     value = getHeaderValue(ptr, len);
   	dataLen = atoi(value->getCString());
+  	
+  	if (isNonPartial) writer->setLength(dataLen);
   	
     delete value;
   	
   	if (!dataLen) return 0; // error, invalid content-length
 	} else if (strncasecmp(ptr, httpContentType, strlen(httpContentType)) == 0) {
 	  value = getHeaderValue(ptr, len);
-	  value->lowerCase();
 	  
 	  if (value->cmpN(mimeMultipartByteranges, strlen(mimeMultipartByteranges)) == 0) {
 	    char *boundary = value->getCString();
@@ -172,12 +184,17 @@ size_t CurlCachedFileResponseHandler::handleHeader(const char *ptr, size_t len)
 	  	boundary++;
 	    
 	    // Skip past "boundary"
-	    boundary = strstr(boundary, mimeMultipartBoundary);
-	    if (boundary == NULL) {
-	  	  error(-1, "Server sent an invalid multipart response (no boundary specified)");
-	  	  return 0;
-	  	}
-	  	boundary += strlen(mimeMultipartBoundary);
+	    while (1) {
+  	    if (*boundary == '\0') {
+	  	    error(-1, "Server sent an invalid multipart response (no boundary specified)");
+	  	    return 0;
+	      } else if (strncasecmp(boundary, mimeMultipartBoundary, strlen(mimeMultipartBoundary)) == 0) {
+	        boundary += strlen(mimeMultipartBoundary);
+	        break;
+	  	  } else {
+	  	    boundary++;
+	  	  }
+	    }
 	  	
 	  	// Skip past "="
 	    boundary = strchr(boundary, mimeValueSeparator);
@@ -190,9 +207,39 @@ size_t CurlCachedFileResponseHandler::handleHeader(const char *ptr, size_t len)
     	enableMultipart(boundary);
     }
     delete value;
+	} else if (strncasecmp(ptr, httpContentRange, strlen(httpContentRange)) == 0) {
+	  value = getHeaderValue(ptr, len);
+	  
+	  parseContentRange(value);
+	  
+	  delete value;
 	}
 	
+	printf("%s", ptr);
+	
 	return len;
+}
+
+void CurlCachedFileResponseHandler::parseContentRange(const GooString *value)
+{
+  char *byteInfo = value->getCString();
+
+  byteInfo = strstr(byteInfo, httpRangeUnit);
+  if (byteInfo == NULL) {
+    error(-1, "Server sent an invalid multipart response (no \"bytes\" in content-range part header)");
+    return;
+  }
+  byteInfo += strlen(httpRangeUnit);
+
+  char *startByteString = strtok(byteInfo, "-/");
+  char *endByteString = strtok(NULL, "-/");
+  char *totalByteString = strtok(NULL, "-/");
+
+  dataLen = atoi(endByteString) - atoi(startByteString) + 1;
+  state = curlResponseStateData;
+
+  // And we can determine the total file size from this header as well
+  writer->setLength(atoi(totalByteString));
 }
 
 size_t CurlCachedFileResponseHandler::handleBody(const char *ptr, size_t len)
@@ -273,20 +320,7 @@ size_t CurlCachedFileResponseHandler::handleBody(const char *ptr, size_t len)
           if (strncasecmp(cursor, httpContentRange, strlen(httpContentRange)) == 0) {
             GooString *value = getHeaderValue(cursor, strlen(cursor));
             
-            char *byteInfo = value->getCString();
-            
-            byteInfo = strstr(byteInfo, httpRangeUnit);
-            if (byteInfo == NULL) {
-              error(-1, "Server sent an invalid multipart response (no \"bytes\" in content-range part header)");
-              return 0;
-            }
-            byteInfo += strlen(httpRangeUnit);
-            
-            char *startByteString = strtok(byteInfo, "-/");
-            char *endByteString = strtok(NULL, "-/");
-
-            dataLen = atoi(endByteString) - atoi(startByteString) + 1;
-            state = curlResponseStateData;
+            parseContentRange(value);
             
             delete value;
             free(cursor);
@@ -319,43 +353,23 @@ size_t CurlCachedFileResponseHandler::handleBody(const char *ptr, size_t len)
 CurlCachedFileLoader::CurlCachedFileLoader()
 {
   url = NULL;
-  cachedFile = NULL;
-  curl = NULL;
+  curl = curl_easy_init();
 }
 
 CurlCachedFileLoader::~CurlCachedFileLoader() {
   curl_easy_cleanup(curl);
 }
 
-static size_t
-noop_cb(char *ptr, size_t size, size_t nmemb, void *ptr2)
+void CurlCachedFileLoader::setUrl(GooString *urlA)
 {
-  return size*nmemb;
+  url = urlA;
 }
 
-size_t
-CurlCachedFileLoader::init(GooString *urlA, CachedFile *cachedFileA)
+long CurlCachedFileLoader::getLatestHttpStatus()
 {
   long code = NULL;
-  double contentLength = -1;
-  size_t size;
-
-  url = urlA;
-  cachedFile = cachedFileA;
-  curl = curl_easy_init();
-
-  curl_easy_setopt(curl, CURLOPT_URL, url->getCString());
-  curl_easy_setopt(curl, CURLOPT_HEADER, 1);
-  curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &noop_cb);
-  curl_easy_perform(curl);
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-  curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &contentLength);
-  curl_easy_reset(curl);
-
-  size = contentLength;
-
-  return size;
+  return code;
 }
 
 static
@@ -376,8 +390,9 @@ int CurlCachedFileLoader::load(const GooVector<ByteRange> &ranges, CachedFileWri
 {
   CURLcode r = CURLE_OK;
   size_t fromByte, toByte;
+  char *newUrl;
   GooString *range = new GooString();
-  CurlCachedFileResponseHandler *handler = new CurlCachedFileResponseHandler(writer);
+  CurlCachedFileResponseHandler *handler = new CurlCachedFileResponseHandler(this, writer);
   
   for (size_t i = 0; i < ranges.size(); i++) {
 		fromByte = ranges[i].offset;
@@ -385,16 +400,31 @@ int CurlCachedFileLoader::load(const GooVector<ByteRange> &ranges, CachedFileWri
 		if (range->getLength()) range->append(',');
 		range->appendf("{0:ud}-{1:ud}", fromByte, toByte);
   }
+  
+ start:
 
-	curl_easy_setopt(curl, CURLOPT_URL, url->getCString());
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, head_cb);
-	curl_easy_setopt(curl, CURLOPT_HEADERDATA, handler);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, load_cb);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
-	curl_easy_setopt(curl, CURLOPT_RANGE, range->getCString());
-	r = curl_easy_perform(curl);
-	curl_easy_reset(curl);
-	
+  curl_easy_setopt(curl, CURLOPT_URL, url->getCString());
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, head_cb);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, handler);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, load_cb);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
+  curl_easy_setopt(curl, CURLOPT_RANGE, range->getCString());
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 25);
+  r = curl_easy_perform(curl);
+  
+  curl_easy_getinfo(curl, CURLINFO_REDIRECT_URL, &newUrl);
+  if (newUrl) {
+    // Follow redirect and retry
+    url->clear();
+    url->append(newUrl);
+    curl_easy_reset(curl);
+    goto start;
+  }
+  
+  curl_easy_reset(curl);
+  
+  writer->eof();
+
 	delete handler;
   delete range;
   

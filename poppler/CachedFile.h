@@ -51,8 +51,9 @@ protected:
 
 public:
 
-  CachedFile(CachedFileLoader *cacheLoader, GooString *uri);
+  CachedFile(CachedFileLoader *cacheLoader, GooString *uriA);
 
+  void loadHeader();
   Guint getLength();
   CachedFileLoader *getLoader();
   
@@ -63,12 +64,12 @@ public:
   int cache(const GooVector<ByteRange> &ranges);
   
   virtual size_t getCacheSize() = 0;
-  virtual void resizeCache(size_t numChunks) = 0;
-  virtual ChunkState getChunkState(int chunk) = 0;
-  virtual void setChunkState(int chunk, ChunkState value) = 0;
-  virtual const char *getChunkPointer(int chunkId) = 0;
-  virtual char *startChunkUpdate(int chunkId) = 0;
-  virtual void endChunkUpdate(int chunkId) = 0;
+  virtual void reserveCacheSpace(size_t len) = 0;
+  virtual ChunkState getChunkState(Guint chunk) = 0;
+  virtual void setChunkState(Guint chunk, ChunkState value) = 0;
+  virtual const char *getChunkPointer(Guint chunkId) = 0;
+  virtual char *startChunkUpdate(Guint chunkId) = 0;
+  virtual void endChunkUpdate(Guint chunkId) = 0;
 
   // Reference counting.
   void incRefCnt();
@@ -78,19 +79,19 @@ protected:
 
   virtual ~CachedFile();
   
-  void setLength(Guint lengthA);
-
-  GooString *uri;
+  virtual void setLength(Guint lengthA);
+  Guint length;
+  GBool lengthKnown;
   
 private:
 
   int cache(size_t offset, size_t length);
 
   CachedFileLoader *loader;
-  GBool loaderIsInitialized;
+  
+  GooString *uri;
 
   size_t streamPos;
-  Guint length;
 
   int refCnt;  // reference count
 
@@ -113,9 +114,19 @@ public:
   CachedFileWriter(CachedFile *cachedFile, GooVector<int> *chunksA);
 
   ~CachedFileWriter();
+  
+  // Notifies the writer that the loader was unable to retrieve a partial
+  // response and will be sending a full response instead.
+  void noteNonPartial();
+  
+  // Informs the writer of the total length of the file
+  void setLength(size_t len);
 
   // Writes size bytes from ptr to cachedFile, returns number of bytes written.
   size_t write(const char *ptr, size_t size);
+  
+  // Signals to the writer that the operation is complete
+  void eof();
 
 private:
 
@@ -123,14 +134,15 @@ private:
   GooVector<int> *chunks;
   GooVector<int>::iterator it;
   size_t offset;
+  size_t pos; // used only in non-partial mode
 
 };
 
 //------------------------------------------------------------------------
 // CachedFileLoader
 //
-// CachedFileLoader is an abstact class that specifies the interface for
-// loadng data from an URI into a CachedFile.
+// CachedFileLoader is an abstract class that specifies the interface for
+// loading data into a CachedFile.
 //------------------------------------------------------------------------
 
 class CachedFileLoader {
@@ -138,11 +150,11 @@ class CachedFileLoader {
 public:
 
   virtual ~CachedFileLoader() {};
-
-  // Initializes the file load.
-  // Returns the length of the file.
-  // The caller is responsible for deleting uri and cachedFile.
-  virtual size_t init(GooString *uri, CachedFile *cachedFile) = 0;
+  
+  // Set source url
+  // The caller is responsible for deleting url.
+  // Note that the loader may modify url, for example in case of a redirect.
+  virtual void setUrl(GooString *urlA) = 0;
 
   // Loads speficified byte ranges and passes it to the writer to store them.
   // Returns 0 on success, Anything but 0 on failure.
