@@ -215,8 +215,6 @@ size_t CurlCachedFileResponseHandler::handleHeader(const char *ptr, size_t len)
 	  delete value;
 	}
 	
-	printf("%s", ptr);
-	
 	return len;
 }
 
