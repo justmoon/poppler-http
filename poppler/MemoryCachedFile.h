@@ -25,12 +25,18 @@ public:
   MemoryCachedFile(CachedFileLoader *cachedFileLoaderA, GooString *uriA);
 
   size_t getCacheSize() { return chunks->size(); }
-  void resizeCache(size_t numChunks) { chunks->resize(numChunks); }
-  ChunkState getChunkState(int chunk) { return (*chunks)[chunk].state; };
-  void setChunkState(int chunk, ChunkState value) { (*chunks)[chunk].state = value; }
-  const char *getChunkPointer(int chunkId) { return (*chunks)[chunkId].data; };
-  char *startChunkUpdate(int chunkId) { return (*chunks)[chunkId].data; };
-  void endChunkUpdate(int chunkId) { };
+  void reserveCacheSpace(size_t len) { chunks->resize(len/CachedFileChunkSize + 1); }
+  ChunkState getChunkState(Guint chunk) {
+  	if (chunk < chunks->size()) {
+      return (*chunks)[chunk].state;
+    } else {
+      return chunkStateNew;
+    }
+  };
+  void setChunkState(Guint chunk, ChunkState value) { (*chunks)[chunk].state = value; }
+  const char *getChunkPointer(Guint chunkId) { return (*chunks)[chunkId].data; };
+  char *startChunkUpdate(Guint chunkId) { return (*chunks)[chunkId].data; };
+  void endChunkUpdate(Guint chunkId) { };
 
 protected:
 
