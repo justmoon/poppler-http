@@ -34,6 +34,9 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   struct stat datastat;
   mode_t oldmask;
   
+  data = NULL;
+  meta = NULL;
+  
   sha1::calc(uriA->getCString(), uriA->getLength(), hash);
   sha1::toHexString(hash, hexstring);
   
