@@ -255,7 +255,7 @@ size_t CachedFileWriter::write(const char *ptr, size_t size)
   size_t len = size;
   size_t nfree, ncopy;
   size_t written = 0;
-  size_t chunk;
+  size_t chunk = 0;
 
   if (!len) return 0;
 

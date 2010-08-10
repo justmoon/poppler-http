@@ -36,6 +36,7 @@ SharedCachedFile::SharedCachedFile(CachedFileLoader *cachedFileLoaderA, GooStrin
   
   data = NULL;
   meta = NULL;
+  cacheSize = 0;
   
   sha1::calc(uriA->getCString(), uriA->getLength(), hash);
   sha1::toHexString(hash, hexstring);
