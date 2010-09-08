@@ -36,6 +36,7 @@
 #include "printencodings.h"
 #include "goo/GooString.h"
 #include "goo/gmem.h"
+#include "goo/GooHash.h"
 #include "GlobalParams.h"
 #include "Object.h"
 #include "Stream.h"
@@ -60,6 +61,7 @@ static int w = 0;
 static int h = 0;
 static GBool physLayout = gFalse;
 static GBool rawOrder = gFalse;
+static GBool relCoord = gFalse;
 static char textEncName[128] = "";
 static char textEOL[16] = "";
 static GBool noPageBreaks = gFalse;
@@ -89,6 +91,8 @@ static const ArgDesc argDesc[] = {
    "maintain original physical layout"},
   {"-raw",     argFlag,     &rawOrder,      0,
    "keep strings in content stream order"},
+  {"-relcoord",argFlag,     &relCoord,      0,
+   "make coords a fraction of page dimensions"},
   {"-enc",     argString,   textEncName,    sizeof(textEncName),
    "output text encoding name"},
   {"-listenc",argFlag,     &printEnc,      0,
@@ -120,6 +124,271 @@ static void TextOutputDev_outputNoop(void *stream, char *text, int len) {
   
 }
 
+#define UNKNOWN_CHAR if (s->getLength() && s->getChar(s->getLength()-1) != '-') \
+    s->append('-');
+
+static GooString *normalize_keyword(GooString *original)
+{
+  GooString *s = new GooString();
+  int i = 0;
+  unsigned char lb;
+
+  while ((lb = original->getChar(i))) {
+    if (( lb & 0x80 ) == 0 ) {           // lead bit is zero, single ascii
+      if ((lb >= 65 && lb <= 90)) { // A-Z
+        s->append(lb+32); // to lowercase
+      } else if ((lb >= 97 && lb <= 122) || // a-z
+                 (lb >= 48 && lb <= 57) ||  // 0-9
+                 lb == '-' || lb == '(' || lb == ')') {
+        s->append(lb);
+      } else {
+        UNKNOWN_CHAR
+      } 
+      i++;
+    } else if (( lb & 0xE0 ) == 0xC0 ) { // 110x xxxx; 2 octets
+      switch (lb) {
+      case 194:
+		switch ((unsigned char)original->getChar(i+1)) {
+        case 169: // ©
+          s->append("(c)");
+          break;
+        case 174: // ®
+          s->append("(r)");
+          break;
+        case 185: // ¹
+          s->append('1');
+          break;
+        case 178: // ²
+          s->append('2');
+          break;
+        case 179: // ³
+          s->append('3');
+          break;
+        case 170: // ª
+          s->append('a');
+          break;
+        case 186: // º
+          s->append('o');
+          break;
+        case 181: // µ
+          s->append('u');
+          break;
+        default:
+          UNKNOWN_CHAR
+        }
+		break;
+      case 195:
+		switch ((unsigned char)original->getChar(i+1)) {
+        case 164: // ä
+          s->append("ae");
+          break;
+        case 132: // Ä
+          s->append("ae");
+          break;
+        case 166: // æ
+          s->append("ae");
+          break;
+        case 134: // Æ
+          s->append("ae");
+          break;
+        case 182: // ö
+          s->append("oe");
+          break;
+        case 150: // Ö
+          s->append("oe");
+          break;
+        case 188: // ü
+          s->append("ue");
+          break;
+        case 156: // Ü
+          s->append("ue");
+          break;
+        case 159: // ß
+          s->append("ss");
+          break;
+        case 128: // À
+          s->append('a');
+          break;
+        case 129: // Á
+          s->append('a');
+          break;
+        case 130: // Â
+          s->append('a');
+          break;
+        case 131: // Ã
+          s->append('a');
+          break;
+        case 133: // Å
+          s->append('a');
+          break;
+        case 135: // Ç
+          s->append('c');
+          break;
+        case 144: // Ð
+          s->append('d');
+          break;
+        case 136: // È
+          s->append('e');
+          break;
+        case 137: // É
+          s->append('e');
+          break;
+        case 138: // Ê
+          s->append('e');
+          break;
+        case 139: // Ë
+          s->append('e');
+          break;
+        case 140: // Ì
+          s->append('i');
+          break;
+        case 141: // Í
+          s->append('i');
+          break;
+        case 142: // Î
+          s->append('i');
+          break;
+        case 143: // Ï
+          s->append('i');
+          break;
+        case 145: // Ñ
+          s->append('n');
+          break;
+        case 146: // Ò
+          s->append('o');
+          break;
+        case 147: // Ó
+          s->append('o');
+          break;
+        case 148: // Ô
+          s->append('o');
+          break;
+        case 149: // Õ
+          s->append('o');
+          break;
+        case 152: // Ø
+          s->append('o');
+          break;
+        case 153: // Ù
+          s->append('u');
+          break;
+        case 154: // Ú
+          s->append('u');
+          break;
+        case 155: // Û
+          s->append('u');
+          break;
+        case 157: // Ý
+          s->append('y');
+          break;
+        case 160: // à
+          s->append('a');
+          break;
+        case 161: // á
+          s->append('a');
+          break;
+        case 162: // â
+          s->append('a');
+          break;
+        case 163: // ã
+          s->append('a');
+          break;
+        case 165: // å
+          s->append('a');
+          break;
+        case 167: // ç
+          s->append('c');
+          break;
+        case 168: // è
+          s->append('e');
+          break;
+        case 169: // é
+          s->append('e');
+          break;
+        case 170: // ê
+          s->append('e');
+          break;
+        case 171: // ë
+          s->append('e');
+          break;
+        case 172: // ì
+          s->append('i');
+          break;
+        case 173: // í
+          s->append('i');
+          break;
+        case 174: // î
+          s->append('i');
+          break;
+        case 175: // ï
+          s->append('i');
+          break;
+        case 177: // ñ
+          s->append('n');
+          break;
+        case 178: // ò
+          s->append('o');
+          break;
+        case 179: // ó
+          s->append('o');
+          break;
+        case 180: // ô
+          s->append('o');
+          break;
+        case 181: // õ
+          s->append('o');
+          break;
+        case 184: // ø
+          s->append('o');
+          break;
+        case 185: // ù
+          s->append('u');
+          break;
+        case 186: // ú
+          s->append('u');
+          break;
+        case 187: // û
+          s->append('u');
+          break;
+        case 151: // ×
+          s->append('x');
+          break;
+        case 189: // ý
+          s->append('y');
+          break;
+        case 191: // ÿ
+          s->append('y');
+          break;
+        default:
+          UNKNOWN_CHAR
+            }
+		break;
+      default:
+		UNKNOWN_CHAR
+          }
+      i+=2;
+    } else if (( lb & 0xF0 ) == 0xE0 ) { // 1110 xxxx; 3 octets
+      if (lb == 0xe2 &&
+          original->getChar(i+1) == 0x84 &&
+          original->getChar(i+2) == 0xa2) {
+        s->append("(TM)");
+      } else {
+		UNKNOWN_CHAR
+      }
+      i+=3;
+    } else if (( lb & 0xF8 ) == 0xF0 ) { // 1111 0xxx; 4 octets
+      UNKNOWN_CHAR
+      i+=4;
+    } else
+      error(-1, "Unrecognized lead byte (%02x)\n", lb);
+  }
+
+  i = s->getLength()-1;
+  if (s->getChar(i) == '-') s->del(i);
+
+  return s;
+}
+
 int main(int argc, char *argv[]) {
   PDFDoc *doc;
   GooString *fileName;
@@ -128,14 +397,19 @@ int main(int argc, char *argv[]) {
   TextOutputDev *textOut;
   TextWordList *wordList;
   int wordListLength;
+  GooHash *keywordIndex;
   FILE *f;
   UnicodeMap *uMap;
   Object info;
   GBool ok;
   char *p;
+  const char *coordFormat;
   char buffer[128];
   int exitCode, bufferLen;
-  double xMin, xMax, yMin, yMax;
+  double xMin, xMax, yMin, yMax, pageWidth = 0.0, pageHeight = 0.0;
+  GooHashIter *iter;
+  GooString *key;
+  void *value;
 
   exitCode = 99;
 
@@ -223,6 +497,8 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  coordFormat = relCoord ? "%.3f" : "%.0f";
+
   // construct text file name
   if (argc == 3) {
     textFileName = new GooString(argv[2]);
@@ -257,15 +533,7 @@ int main(int argc, char *argv[]) {
     goto err3;
   }
 
-  if (!textFileName->cmp("-")) {
-    f = stdout;
-  } else {
-    if (!(f = fopen(textFileName->getCString(), "w"))) {
-      error(-1, "Couldn't open text file '%s'", textFileName->getCString());
-      exitCode = 2;
-      goto err3;
-    }
-  }   
+  keywordIndex = new GooHash();
 
   for (int page = firstPage; page <= lastPage; ++page) {
     if ((w==0) && (h==0) && (x==0) && (y==0)) {
@@ -277,36 +545,79 @@ int main(int argc, char *argv[]) {
                             x, y, w, h);
     }
 
+    if (relCoord) {
+      pageWidth = doc->getPageMediaWidth(page);
+      pageHeight = doc->getPageMediaHeight(page);
+    }
+
     wordList = textOut->makeWordList();
     wordListLength = wordList->getLength();
 
     for (int word = 0; word < wordListLength; ++word) {
       TextWord *w = wordList->get(word);
-      GooString *s = new GooString();
+      GooString *s = normalize_keyword(w->getText());
+
+      if (s->getLength() == 0) {
+        delete s;
+        continue;
+      }
+
+      // fetch keyword string if it exists, otherwise add it
+      value = keywordIndex->lookup(s);
+
+      if (value == NULL) {
+        keywordIndex->add(new GooString(s), (void*)s);
+      } else {
+        delete s;
+        s = (GooString*) value;
+      }
 
       w->getBBox(&xMin, &yMin, &xMax, &yMax);
 
-      bufferLen = sprintf(buffer, "%.0f", xMin);
-      s->append(buffer, bufferLen);
-      s->append(":");
-      bufferLen = sprintf(buffer, "%.0f", yMin);
-      s->append(buffer, bufferLen);
-      s->append(":");
-      bufferLen = sprintf(buffer, "%.0f", xMax);
-      s->append(buffer, bufferLen);
-      s->append(":");
-      bufferLen = sprintf(buffer, "%.0f", yMax);
-      s->append(buffer, bufferLen);
-      s->append(":");
+      if (relCoord) {
+        xMin = xMin/pageWidth;
+        xMax = xMax/pageWidth;
+        yMin = yMin/pageHeight;
+        yMax = yMax/pageHeight;
+      }
 
-      s->append(w->getText());
-
-      s->append("\n");
-
-      fputs(s->getCString(), f);
+      s->append(";");
+      s->appendf("{0:d}", page);
+      s->append(":");
+      bufferLen = sprintf(buffer, coordFormat, xMin);
+      s->append(buffer, bufferLen);
+      s->append(":");
+      bufferLen = sprintf(buffer, coordFormat, yMin);
+      s->append(buffer, bufferLen);
+      s->append(":");
+      bufferLen = sprintf(buffer, coordFormat, xMax);
+      s->append(buffer, bufferLen);
+      s->append(":");
+      bufferLen = sprintf(buffer, coordFormat, yMax);
+      s->append(buffer, bufferLen);
     }
   }
   delete textOut;
+
+  if (!textFileName->cmp("-")) {
+    f = stdout;
+  } else {
+    if (!(f = fopen(textFileName->getCString(), "w"))) {
+      error(-1, "Couldn't open text file '%s'", textFileName->getCString());
+      exitCode = 2;
+      goto err3;
+    }
+  }
+
+  keywordIndex->startIter(&iter);
+  while (keywordIndex->getNext(&iter, &key, &value)) {
+    // just using key as a temp var because it happens to be a GooString*
+    key = (GooString *) value;
+    fputs(key->getCString(), f);
+    fputc('\n', f);
+  }
+  keywordIndex->killIter(&iter);
+  deleteGooHash (keywordIndex, GooString);
 
   if (f != stdout) {
     fclose(f);
