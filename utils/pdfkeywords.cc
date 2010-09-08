@@ -62,6 +62,7 @@ static int h = 0;
 static GBool physLayout = gFalse;
 static GBool rawOrder = gFalse;
 static GBool relCoord = gFalse;
+static GBool pctCoord = gFalse;
 static char textEncName[128] = "";
 static char textEOL[16] = "";
 static GBool noPageBreaks = gFalse;
@@ -93,6 +94,8 @@ static const ArgDesc argDesc[] = {
    "keep strings in content stream order"},
   {"-relcoord",argFlag,     &relCoord,      0,
    "make coords a fraction of page dimensions"},
+  {"-pctcoord",argFlag,     &pctCoord,      0,
+   "make coords a percentage of page dimensions"},
   {"-enc",     argString,   textEncName,    sizeof(textEncName),
    "output text encoding name"},
   {"-listenc",argFlag,     &printEnc,      0,
@@ -405,8 +408,8 @@ int main(int argc, char *argv[]) {
   char *p;
   const char *coordFormat;
   char buffer[128];
-  int exitCode, bufferLen;
-  double xMin, xMax, yMin, yMax, pageWidth = 0.0, pageHeight = 0.0;
+  int exitCode, bufferLen, coordMult;
+  double xMin, xMax, yMin, yMax, width, height, pageWidth = 0.0, pageHeight = 0.0;
   GooHashIter *iter;
   GooString *key;
   void *value;
@@ -497,7 +500,9 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+  if (pctCoord) relCoord = gTrue;
   coordFormat = relCoord ? "%.3f" : "%.0f";
+  coordMult = pctCoord ? 100 : 1;
 
   // construct text file name
   if (argc == 3) {
@@ -574,11 +579,14 @@ int main(int argc, char *argv[]) {
 
       w->getBBox(&xMin, &yMin, &xMax, &yMax);
 
+      width = xMax - xMin;
+      height = yMax - yMin;
+
       if (relCoord) {
-        xMin = xMin/pageWidth;
-        xMax = xMax/pageWidth;
-        yMin = yMin/pageHeight;
-        yMax = yMax/pageHeight;
+        xMin = xMin/pageWidth * coordMult;
+        yMin = yMin/pageHeight * coordMult;
+        width = width/pageWidth * coordMult;
+        height = height/pageHeight * coordMult;
       }
 
       s->append(";");
@@ -590,10 +598,10 @@ int main(int argc, char *argv[]) {
       bufferLen = sprintf(buffer, coordFormat, yMin);
       s->append(buffer, bufferLen);
       s->append(":");
-      bufferLen = sprintf(buffer, coordFormat, xMax);
+      bufferLen = sprintf(buffer, coordFormat, width);
       s->append(buffer, bufferLen);
       s->append(":");
-      bufferLen = sprintf(buffer, coordFormat, yMax);
+      bufferLen = sprintf(buffer, coordFormat, height);
       s->append(buffer, bufferLen);
     }
   }
