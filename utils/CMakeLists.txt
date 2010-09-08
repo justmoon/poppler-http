@@ -86,6 +86,15 @@ target_link_libraries(pdftotext ${common_libs})
 install(TARGETS pdftotext DESTINATION bin)
 install(FILES pdftotext.1 DESTINATION share/man/man1)
 
+# pdfkeywords
+set(pdfkeywords_SOURCES ${common_srcs}
+  pdfkeywords.cc printencodings.cc
+)
+add_executable(pdfkeywords ${pdfkeywords_SOURCES})
+target_link_libraries(pdfkeywords ${common_libs})
+install(TARGETS pdfkeywords DESTINATION bin)
+install(FILES pdfkeywords.1 DESTINATION share/man/man1)
+
 # pdftohtml
 set(pdftohtml_SOURCES ${common_srcs}
   pdftohtml.cc
