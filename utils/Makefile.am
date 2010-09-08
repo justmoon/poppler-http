@@ -61,6 +61,7 @@ bin_PROGRAMS =					\
 	pdfinfo					\
 	pdftops					\
 	pdftotext				\
+	pdfkeywords				\
 	pdftohtml				\
 	pdfexref				\
 	$(pdftoppm_binary)			\
@@ -73,6 +74,7 @@ dist_man1_MANS =				\
 	pdfinfo.1				\
 	pdftops.1				\
 	pdftotext.1				\
+	pdfkeywords.1			\
 	pdftohtml.1				\
 	$(pdftoppm_manpage)     \
 	$(pdftocairo_manpage)
@@ -101,6 +103,12 @@ pdftops_SOURCES =				\
 
 pdftotext_SOURCES =				\
 	pdftotext.cc				\
+	printencodings.cc			\
+	printencodings.h			\
+	$(common)
+
+pdfkeywords_SOURCES =				\
+	pdfkeywords.cc				\
 	printencodings.cc			\
 	printencodings.h			\
 	$(common)
