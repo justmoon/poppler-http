@@ -84,6 +84,23 @@ void PDFRectangle::clipTo(PDFRectangle *rect) {
   }
 }
 
+void PDFRectangle::extendTo(double x, double y) {
+  if (x1 < x2) {
+    if (x < x1) x1 = x;
+    if (x > x2) x2 = x;
+  } else {
+    if (x > x1) x1 = x;
+    if (x < x2) x2 = x;
+  }
+  if (y1 < y2) {
+    if (y < y1) y1 = y;
+    if (y > y2) y2 = y;
+  } else {
+    if (y > y1) y1 = y;
+    if (y < y2) y2 = y;
+  }
+}
+
 //------------------------------------------------------------------------
 // PageAttrs
 //------------------------------------------------------------------------

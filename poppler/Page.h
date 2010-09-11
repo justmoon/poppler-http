@@ -56,6 +56,7 @@ public:
     { x1 = x1A; y1 = y1A; x2 = x2A; y2 = y2A; }
   GBool isValid() { return x1 != 0 || y1 != 0 || x2 != 0 || y2 != 0; }
   void clipTo(PDFRectangle *rect);
+  void extendTo(double x, double y);
 };
 
 //------------------------------------------------------------------------
