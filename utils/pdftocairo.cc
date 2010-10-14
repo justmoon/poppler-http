@@ -141,21 +141,28 @@ static const ArgDesc argDesc[] = {
 static void format_output_filename(char *outFile, const char *outRoot,
            int pg_num_len, int pg)
 {
-  if (!outRoot) outRoot = "cairoout";
-  
-  snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d",
-    OUT_FILE_SZ - 32, outRoot, pg_num_len, pg);
-  
+  const char *extension;
+
   if (png) {
-    strcat(outFile, ".png");
+    extension = "png";
   } else if (jpg) {
-    strcat(outFile, ".jpg");
+    extension = "jpg";
   } else if (ps) {
-    strcat(outFile, ".ps");
+    extension = "ps";
   } else if (pdf) {
-    strcat(outFile, ".pdf");
+    extension = "pdf";
   } else if (svg) {
-    strcat(outFile, ".svg");
+    extension = "svg";
+  }
+  
+  if (!outRoot) outRoot = "cairoout";
+
+  if (split) {
+    snprintf(outFile, OUT_FILE_SZ, "%.*s-%0*d.%s",
+             OUT_FILE_SZ - 32, outRoot, pg_num_len, pg, extension);
+  } else {
+    snprintf(outFile, OUT_FILE_SZ, "%.*s.%s",
+             OUT_FILE_SZ - 32, outRoot, extension);
   }
 }
 
@@ -334,13 +341,20 @@ int main(int argc, char *argv[]) {
   // JPEG and PNG don't support multiple pages
   split = split || jpg || png;
 
-  if (argc > 1) fileName = new GooString(argv[1]);
-  if (argc == 3) {
-    outRoot = strdup(argv[2]);
+  fileName = new GooString(argv[1]);
+  if (argc == 23) {
+    // take everything after the last slash
+    p = strrchr(argv[1], '/');
+    if (p) p++;
+    else p = argv[1];
+    outRoot = strdup(p);
 
+    // remove the last dot and whatever comes after it
     p = strrchr(outRoot, '.');
     if (p)
       *p = 0;
+  } else if (argc >= 3) {
+    outRoot = strdup(argv[2]);
   }
 
   // read config file
