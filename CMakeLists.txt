@@ -362,6 +362,8 @@ if(PNG_FOUND)
   set(poppler_LIBS ${poppler_LIBS} ${PNG_LIBRARIES})
 endif(PNG_FOUND)
 
+set(poppler_LIBS ${poppler_LIBS} rt)
+
 if(MSVC)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 add_library(poppler STATIC ${poppler_SRCS})
